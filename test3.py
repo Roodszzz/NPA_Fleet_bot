@@ -53,6 +53,10 @@ def get_logo_bytes():
 # ===== Состояния =====
 SERIAL, ALLOCATION, TEAM_NUMBER, USER, DESCRIPTION = range(5)
 translator = Translator()
+
+
+
+
 # Менеджеры по локации
 managers = {
     "Shyroke": "manager_shyroke@example.com",
@@ -249,10 +253,6 @@ async def serial_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-
-
-  
-
 async def allocation_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -293,20 +293,56 @@ async def team_number_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Enter your full name / Введіть ваше ПІБ:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]]))
     return USER
 
+
+
 async def user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if not text:
-        await update.message.reply_text("❌ You did not enter your name / ❌ Ви не ввели ПІБ. Try again / Спробуйте ще раз:")
+        await update.message.reply_text(
+            "❌ You did not enter your name / ❌ Ви не ввели ПІБ. Try again / Спробуйте ще раз:"
+        )
         return USER
+
     user_name_latin = unidecode(text)
     ws = context.user_data['ws']
+
+    # Записываем данные пользователя
     set_cell(ws, "F4", user_name_latin)
     set_cell(ws, "A10", user_name_latin)
-    set_cell(ws, "D10", "F.A. Oleksandr Rudnov")
+
+    # Подставляем фамилию менеджера по локации
+    managers_fa = {
+        "Shyroke": "F.A. Oleksandr Rudnov",
+        "Mykolaiv": "F.A. Andriy Padalka"
+    }
+    location = context.user_data.get('location')
+    manager_fa = managers_fa.get(location, "F.A. Unknown")
+    set_cell(ws, "D10", manager_fa)
+
+    # Дата
     today_str = datetime.now().strftime("%Y-%m-%d")
     set_cell(ws, "B10", today_str)
-    await update.message.reply_text("Briefly describe the situation / Коротко опишіть ситуацію:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]]))
+
+    await update.message.reply_text(
+        "Briefly describe the situation / Коротко опишіть ситуацію:",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]])
+    )
     return DESCRIPTION
+
+# async def user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+#     text = update.message.text.strip()
+#     if not text:
+#         await update.message.reply_text("❌ You did not enter your name / ❌ Ви не ввели ПІБ. Try again / Спробуйте ще раз:")
+#         return USER
+#     user_name_latin = unidecode(text)
+#     ws = context.user_data['ws']
+#     set_cell(ws, "F4", user_name_latin)
+#     set_cell(ws, "A10", user_name_latin)
+#     set_cell(ws, "D10", "F.A. Oleksandr Rudnov")
+#     today_str = datetime.now().strftime("%Y-%m-%d")
+#     set_cell(ws, "B10", today_str)
+#     await update.message.reply_text("Briefly describe the situation / Коротко опишіть ситуацію:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]]))
+#     return DESCRIPTION
 
 
 
@@ -315,6 +351,9 @@ async def user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
 from openpyxl.drawing.image import Image  # <- убедись, что импорт есть
 
 from openpyxl.drawing.image import Image  # убедись, что импорт есть
+
+
+
 
 async def description_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
@@ -338,13 +377,22 @@ async def description_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     img.height = 72  # высота в пикселях
     ws.add_image(img, "A1")  # вставляем в ячейку A1
 
+    # ==== Формируем динамическое имя файла ====
+    # если у тебя сохраняется номер машины в user_data (например context.user_data['plate']),
+    # то можно его вставить
+
+    plate = ws["D4"].value or "CAR"
+    filename = f"LDR_{plate}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.xlsx"
+    # plate = context.user_data.get("plate", "CAR")  
+    # filename = f"LDR_{plate}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.xlsx"
+
     # Сохраняем workbook в поток памяти
     file_stream = BytesIO()
     ws.parent.save(file_stream)
     file_stream.seek(0)
 
     # Отправка пользователю
-    # await update.message.reply_document(document=file_stream, filename="result.xlsx")
+    await update.message.reply_document(document=file_stream, filename=filename)
     await update.message.reply_text("✅ File sent / ✅ Файл відправлено")
 
     # Отправка менеджерам по локации
@@ -353,12 +401,12 @@ async def description_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ADMIN_ID = int(os.getenv("ADMIN_ID"))
         tg_users = {
             "Shyroke": [ADMIN_ID],
-            "Mykolaiv": [] # заглушка
+            "Mykolaiv": [ADMIN_ID]  # заглушка
         }  
         
         for user_id in tg_users.get(location, []):
             file_stream.seek(0)
-            await context.bot.send_document(chat_id=user_id, document=file_stream, filename="result.xlsx")
+            await context.bot.send_document(chat_id=user_id, document=file_stream, filename=filename)
         
         if location != "Shyroke":
             logging.info(f"[TEST MODE] Excel would be sent to manager for {location}")
@@ -378,6 +426,70 @@ async def description_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     return ConversationHandler.END
+
+
+# async def description_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+#     text = update.message.text.strip()
+#     if not text:
+#         await update.message.reply_text(
+#             "❌ Describe the situation / ❌ Опишіть ситуацію. Try again / Спробуйте ще раз:"
+#         )
+#         return DESCRIPTION
+
+#     # Перевод текста на английский
+#     text_en = await translate_to_en(text)
+
+#     ws = context.user_data['ws']
+#     set_cell(ws, "A9", text_en)
+#     auto_adjust(ws, ["B4","D4","B6","D6","F4","A10","A9","B10"])
+
+#     # ==== Вставляем логотип в Excel ====
+#     logo_path = os.path.join(os.path.dirname(__file__), "logo", "Лого ексель.png")
+#     img = Image(logo_path)
+#     img.width = 396  # ширина в пикселях
+#     img.height = 72  # высота в пикселях
+#     ws.add_image(img, "A1")  # вставляем в ячейку A1
+
+#     # Сохраняем workbook в поток памяти
+#     file_stream = BytesIO()
+#     ws.parent.save(file_stream)
+#     file_stream.seek(0)
+
+#     # Отправка пользователю
+#     # await update.message.reply_document(document=file_stream, filename="result.xlsx")
+#     await update.message.reply_text("✅ File sent / ✅ Файл відправлено")
+
+#     # Отправка менеджерам по локации
+#     location = context.user_data.get('location')
+#     if location:
+#         ADMIN_ID = int(os.getenv("ADMIN_ID"))
+#         tg_users = {
+#             "Shyroke": [ADMIN_ID],
+#             "Mykolaiv": [ADMIN_ID] # заглушка
+#         }  
+        
+#         for user_id in tg_users.get(location, []):
+#             file_stream.seek(0)
+#             await context.bot.send_document(chat_id=user_id, document=file_stream, filename="result.xlsx")
+        
+#         if location != "Shyroke":
+#             logging.info(f"[TEST MODE] Excel would be sent to manager for {location}")
+
+#     # Очистка данных пользователя
+#     context.user_data.clear()
+
+#     # Стартовое окно с логотипом для Telegram
+#     logo_bytes_start = get_logo_bytes()
+#     logo_file = InputFile(logo_bytes_start, filename="logo.png")
+#     keyboard = [[InlineKeyboardButton("Start / Почати", callback_data="main_menu")]]
+#     reply_markup = InlineKeyboardMarkup(keyboard)
+#     await update.message.reply_photo(
+#         photo=logo_file,
+#         caption="Welcome to NPA Fleet bot 🚗\nЛаскаво просимо в NPA Fleet бот",
+#         reply_markup=reply_markup
+#     )
+
+#     return ConversationHandler.END
 
 
 
