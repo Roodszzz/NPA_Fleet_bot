@@ -38,12 +38,7 @@ def get_workbook():
     return load_workbook(file_path)
 
 
-# def get_workbook():
-#     file_path = "/home/noob/BOT/excel/excel.txt"  # путь к txt с base64
-#     with open(file_path, "r") as f:
-#         encoded_excel = f.read()
-#     file_bytes = base64.b64decode(encoded_excel)
-#     return load_workbook(filename=BytesIO(file_bytes))
+
 
 # ===== Встроенный логотип =====
 
@@ -100,36 +95,6 @@ async def send_excel_to_manager(location, file_stream):
     logging.info(f"[TEST MODE] Excel would be sent to {email_to} for location {location}")
     print(f"[TEST MODE] Excel would be sent to {email_to} for location {location}")
             
-
-
-# async def send_excel_to_manager(location, file_stream):
-#     if location == "Shyroke":
-#         email_to = "OleRud441@npaid.org"
-#         msg = EmailMessage()
-#         msg['Subject'] = f"NPA Vehicle Report - {location}"
-#         msg['From'] = email_to
-#         msg['To'] = email_to
-#         msg.set_content(f"Please find attached the latest vehicle report for {location}.")
-
-#         file_stream.seek(0)
-#         msg.add_attachment(
-#             file_stream.read(),
-#             maintype='application',
-#             subtype='vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-#             filename="report.xlsx"
-#         )
-
-#         # Настройки SMTP для Outlook
-#         with smtplib.SMTP("smtp.office365.com", 587) as server:
-#             server.starttls()
-#             server.login(email_to, "Shyroke-441")  # пароль
-#             server.send_message(msg)
-
-#         logging.info(f"Excel sent to {email_to} for {location}")
-#     else:
-#         # Заглушка для других менеджеров
-#         logging.info(f"[TEST MODE] Excel would be sent to manager for {location}")
-#         print(f"[TEST MODE] Excel would be sent to manager for {location}")
 
 
 
@@ -282,61 +247,11 @@ async def serial_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return ALLOCATION
 
-# async def serial_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     text = update.message.text.strip().upper()  # переводим в верхний регистр
-#     text = text.replace(" ", "")  # убираем пробелы
-
-#     # проверка формата: две буквы - дефис - две цифры
-#     if not re.fullmatch(r"[A-Z]{2}-\d{2}", text):
-#         await update.message.reply_text(
-#             "❌ Неверный формат номера авто. Формат должен быть: AA-12\nTry again / Спробуйте ще раз:"
-#         )
-#         return SERIAL
-
-#     ws = context.user_data['ws']
-#     set_cell(ws, "D4", text)  # записываем нормализованный номер
-
-#     keyboard = [
-#         [InlineKeyboardButton("LOGS", callback_data="LOGS")],
-#         [InlineKeyboardButton("MTT", callback_data="MTT")],
-#         [InlineKeyboardButton("MDD", callback_data="MDD")],
-#         [InlineKeyboardButton("TFM", callback_data="TFM")],
-#         [InlineKeyboardButton("QA", callback_data="QA")],
-#         [InlineKeyboardButton("NTS", callback_data="NTS")],
-#         [InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]
-#     ]
-#     await update.message.reply_text(
-#         "Choose Allocation / Оберіть Allocation:", 
-#         reply_markup=InlineKeyboardMarkup(keyboard)
-#     )
-#     return ALLOCATION
-
-
-
-# async def serial_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     text = update.message.text.strip()
-#     if not text:
-#         await update.message.reply_text("❌ You did not enter a vehicle number / ❌ Ви не ввели номер авто. Try again / Спробуйте ще раз:")
-#         return SERIAL
-#     ws = context.user_data['ws']
-#     set_cell(ws, "D4", text)
-
-#     keyboard = [
-#         [InlineKeyboardButton("LOGS", callback_data="LOGS")],
-#         [InlineKeyboardButton("MTT", callback_data="MTT")],
-#         [InlineKeyboardButton("MDD", callback_data="MDD")],
-#         [InlineKeyboardButton("TFM", callback_data="TFM")],
-#         [InlineKeyboardButton("QA", callback_data="QA")],
-#         [InlineKeyboardButton("NTS", callback_data="NTS")],
-#         [InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]
-#     ]
-#     await update.message.reply_text("Choose Allocation / Оберіть Allocation:", reply_markup=InlineKeyboardMarkup(keyboard))
-#     return ALLOCATION
 
 
 
 
-    
+  
 
 async def allocation_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
