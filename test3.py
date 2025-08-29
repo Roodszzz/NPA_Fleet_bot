@@ -13,12 +13,11 @@ from datetime import datetime
 from googletrans import Translator
 from unidecode import unidecode
 import base64
-import smtplib
 import re
-from email.message import EmailMessage
-import os
 import os
 from dotenv import load_dotenv
+
+
 
 load_dotenv()  # Загружаем .env
 TOKEN = os.getenv("TOKEN")
@@ -29,29 +28,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 #==========================================================MFR======================================================================
-# ===== MFR Excel =====
-def get_workbook_mfr():
-    current_dir = os.path.dirname(__file__)
-    file_path = os.path.join(current_dir, "excel", "MFR.xlsx")
-    return load_workbook(file_path)
 
-
-managers_mfr = {
-    "Shyroke": "mfr_manager_shyroke@example.com",
-    "Mykolaiv": "mfr_manager_mykolaiv@example.com"
-}
-
-async def mfr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    keyboard = [
-        [InlineKeyboardButton("Option 1 / Варіант 1", callback_data="mfr_opt1")],
-        [InlineKeyboardButton("Option 2 / Варіант 2", callback_data="mfr_opt2")],
-        [InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]
-    ]
-    try: await query.message.delete()
-    except: pass
-    await query.message.reply_text("Choose request type for MFR / Виберіть тип звернення для MFR:", reply_markup=InlineKeyboardMarkup(keyboard))
 
 
 
@@ -123,16 +100,6 @@ def auto_adjust(ws, cells):
             )
 
 
-
-async def send_excel_to_manager(location, file_stream):
-    email_to = managers.get(location)
-    if not email_to:
-        logging.warning(f"No manager found for location: {location}")
-        return
-
-    # Заглушка — просто логируем, что файл "отправлен"
-    logging.info(f"[TEST MODE] Excel would be sent to {email_to} for location {location}")
-    print(f"[TEST MODE] Excel would be sent to {email_to} for location {location}")
             
 
 
@@ -216,33 +183,7 @@ async def ldr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try: await query.message.delete()
     except: pass
     await query.message.reply_text("Choose request type / Виберіть тип звернення:", reply_markup=reply_markup)
-async def mfr_request_type_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    
-    data = query.data
-    if data == "cancel":
-        return await cancel(update, context)
-    
-    # Создаем workbook и worksheet для MFR
-    context.user_data['wb'] = get_workbook()  # Можно сделать отдельный шаблон для MFR, если нужно
-    context.user_data['ws'] = context.user_data['wb'].active
-    ws = context.user_data['ws']
 
-    # Можно здесь сразу записать тип MFR в нужную ячейку
-    set_cell(ws, "B4", f"{data} / MFR")  # Заглушка, поменяешь на нужные ячейки
-
-    # Спросим локацию (как в LDR)
-    keyboard = [
-        [InlineKeyboardButton("Shyroke", callback_data="Shyroke")],
-        [InlineKeyboardButton("Mykolaiv", callback_data="Mykolaiv")],
-        [InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]
-    ]
-    try: await query.message.delete()
-    except: pass
-    await query.message.reply_text("Select vehicle location / Оберіть локацію автомобіля:", reply_markup=InlineKeyboardMarkup(keyboard))
-    
-    return ALLOCATION
 
 
 
@@ -396,9 +337,145 @@ async def user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-from openpyxl.drawing.image import Image  # <- убедись, что импорт есть
+#-=======================MFR111+===========================
 
-from openpyxl.drawing.image import Image  # убедись, что импорт есть
+# ===== MFR модели авто =====
+MFR_MODELS = [
+    "Toyota Hilux",
+    "Toyota Land Cruiser",
+    "Ford Transit",
+    "Ford Ranger",
+    "Mitsubishi L200",
+    "Volkswagen",
+    "Renault Duster"
+]
+
+# ===== MFR старт =====
+async def mfr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    # Клавиатура для выбора модели авто
+    keyboard = [[InlineKeyboardButton(model, callback_data=model)] for model in MFR_MODELS]
+    keyboard.append([InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")])
+
+    try: await query.message.delete()
+    except: pass
+
+    await query.message.reply_text(
+        "Select vehicle model / Оберіть модель авто:", 
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    return SERIAL  # следующий шаг – ввод серийного номера/ID
+
+# ===== Серийный номер / ID =====
+async def mfr_serial_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip().upper().replace(" ", "")
+    ws = context.user_data['ws']
+
+    # Заглушка записи модели в Excel
+    model = context.user_data.get("vehicle")
+    set_cell(ws, "A1", model or "MODEL")  # сюда потом вставишь нужную ячейку
+
+    # Проверка формата номера (пример)
+    if not re.fullmatch(r"[A-Z]{2}-\d{2}", text):
+        await update.message.reply_text(
+            "❌ Invalid format. Example: AA-12 / Неправильний формат. Приклад: AA-12"
+        )
+        return SERIAL
+
+    context.user_data['serial'] = text
+    set_cell(ws, "B1", text)  # заглушка для серийного номера
+    # Далее – выбор локации
+    keyboard = [
+        [InlineKeyboardButton("Shyroke", callback_data="Shyroke")],
+        [InlineKeyboardButton("Mykolaiv", callback_data="Mykolaiv")],
+        [InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]
+    ]
+    await update.message.reply_text(
+        "Select vehicle location / Оберіть локацію автомобіля:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    return ALLOCATION
+
+# ===== Локация и Allocation =====
+async def mfr_allocation_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    selection = query.data
+    ws = context.user_data['ws']
+
+    if selection == "cancel":
+        return await cancel(update, context)
+
+    context.user_data['location'] = selection
+    set_cell(ws, "C1", selection)  # заглушка для локации
+
+    # Если NTS, MTT, MDD – спрашиваем номер команды
+    allocation_options = ["NTS", "MTT", "MDD"]
+    if selection.upper() in allocation_options:
+        context.user_data['allocation'] = selection
+        await query.message.reply_text(
+            f"Enter team number for {selection} / Введіть номер команди для {selection}:",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]])
+        )
+        return TEAM_NUMBER
+    else:
+        # Иначе ввод имени
+        await query.message.reply_text(
+            "Enter your full name / Введіть ПІБ:",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]])
+        )
+        return USER
+
+# ===== Номер команды =====
+async def mfr_team_number_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    if not text.isdigit():
+        await update.message.reply_text("❌ Team number must be a number / ❌ Номер команди повинен бути числом")
+        return TEAM_NUMBER
+    ws = context.user_data['ws']
+    allocation = context.user_data.get('allocation', 'Unknown')
+    set_cell(ws, "D1", f"{allocation}-{text}")  # заглушка для номера команды
+    await update.message.reply_text(
+        "Enter your full name / Введіть ПІБ:",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]])
+    )
+    return USER
+
+# ===== Имя пользователя =====
+async def mfr_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    if not text:
+        await update.message.reply_text("❌ You did not enter your name / ❌ Ви не ввели ПІБ")
+        return USER
+    ws = context.user_data['ws']
+    user_name = unidecode(text)
+    context.user_data['user_name'] = user_name
+    set_cell(ws, "E1", user_name)  # заглушка для имени
+    await update.message.reply_text(
+        "Briefly describe the situation / Коротко опишіть ситуацію:",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]])
+    )
+    return DESCRIPTION
+
+# ===== Описание =====
+async def mfr_description_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    if not text:
+        await update.message.reply_text("❌ Describe the situation / ❌ Опишіть ситуацію")
+        return DESCRIPTION
+    ws = context.user_data['ws']
+    set_cell(ws, "F1", text)  # заглушка для описания
+    await update.message.reply_text("✅ MFR form completed (Excel placeholders used) / MFR форма заповнена")
+
+    # Очистка данных пользователя
+    context.user_data.clear()
+    return ConversationHandler.END
+
+
+
+
 
 
 
@@ -482,129 +559,7 @@ async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TY
     return ConversationHandler.END
 
 
-# async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     text = update.message.text.strip()
-#     if not text:
-#         await update.message.reply_text(
-#             "❌ Describe the situation / ❌ Опишіть ситуацію. Try again / Спробуйте ще раз:"
-#         )
-#         return DESCRIPTION
 
-#     # Перевод текста на английский
-#     text_en = await translate_to_en(text)
-
-#     ws = context.user_data['ws']
-
-#     # ====== Здесь назначаем ячейки ======
-#     plate = context.user_data.get("plate", "CAR")        # Номер авто или call sign
-#     user_name = context.user_data.get("user_name", "Unknown")  # Имя пользователя
-#     today_str = datetime.now().strftime("%Y-%m-%d")      # Дата
-
-#     set_cell(ws, "D4", plate)        # номер авто / call sign
-#     set_cell(ws, "B6", user_name)    # ФИО пользователя
-#     set_cell(ws, "A9", text_en)      # описание ситуации
-#     set_cell(ws, "F4", today_str)    # дата
-
-#     # Авто подгонка ширины/высоты
-#     auto_adjust(ws, ["D4","B6","A9","F4"])
-
-#     # ===== Логотип =====
-#     logo_path = os.path.join(os.path.dirname(__file__), "logo", "Лого ексель.png")
-#     img = Image(logo_path)
-#     img.width, img.height = 396, 72
-#     ws.add_image(img, "A1")
-
-#     # ===== Имя файла =====
-#     filename = f"MFR_{plate}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.xlsx"
-
-#     # ===== Сохраняем в поток =====
-#     file_stream = BytesIO()
-#     ws.parent.save(file_stream)
-#     file_stream.seek(0)
-
-#     # ===== Отправляем пользователю =====
-#     await update.message.reply_document(document=file_stream, filename=filename)
-#     await update.message.reply_text("✅ MFR File sent / ✅ Файл MFR відправлено")
-
-#     # ===== Отправка менеджерам =====
-#     location = context.user_data.get('location')
-#     if location:
-#         email_to = managers_mfr.get(location)
-#         if email_to:
-#             logging.info(f"[TEST MODE] Excel would be sent to {email_to} for location {location}")
-#             for admin_id in [int(os.getenv("ADMIN_ID"))]:  # заглушка
-#                 file_stream.seek(0)
-#                 await context.bot.send_document(chat_id=admin_id, document=file_stream, filename=filename)
-
-#     # ===== Очистка данных =====
-#     context.user_data.clear()
-
-#     # ===== Стартовое меню с логотипом =====
-#     logo_bytes_start = get_logo_bytes()
-#     logo_file = InputFile(logo_bytes_start, filename="logo.png")
-#     keyboard = [[InlineKeyboardButton("Start / Почати", callback_data="main_menu")]]
-#     reply_markup = InlineKeyboardMarkup(keyboard)
-#     await update.message.reply_photo(
-#         photo=logo_file,
-#         caption="Welcome to NPA Fleet bot 🚗\nЛаскаво просимо в NPA Fleet бот",
-#         reply_markup=reply_markup
-#     )
-
-#     return ConversationHandler.END
-
-
-# async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     text = update.message.text.strip()
-#     if not text:
-#         await update.message.reply_text("❌ Describe the situation / ❌ Опишіть ситуацію. Try again / Спробуйте ще раз:")
-#         return DESCRIPTION
-
-#     text_en = await translate_to_en(text)
-
-#     ws = context.user_data['ws']
-#     set_cell(ws, "A9", text_en)
-#     auto_adjust(ws, ["B4","D4","B6","D6","F4","A10","A9","B10"])
-
-#     # Логотип
-#     logo_path = os.path.join(os.path.dirname(__file__), "logo", "Лого ексель.png")
-#     img = Image(logo_path)
-#     img.width, img.height = 396, 72
-#     ws.add_image(img, "A1")
-
-#     # Имя файла
-#     plate = ws["D4"].value or "CAR"
-#     filename = f"MFR_{plate}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.xlsx"
-
-#     # Сохраняем
-#     file_stream = BytesIO()
-#     ws.parent.save(file_stream)
-#     file_stream.seek(0)
-
-#     # Отправляем пользователю
-#     await update.message.reply_document(document=file_stream, filename=filename)
-#     await update.message.reply_text("✅ MFR File sent / ✅ Файл MFR відправлено")
-
-#     # Отправляем менеджерам
-#     location = context.user_data.get('location')
-#     if location:
-#         email_to = managers_mfr.get(location)
-#         if email_to:
-#             logging.info(f"[TEST MODE] Excel would be sent to {email_to} for location {location}")
-#             for admin_id in [int(os.getenv("ADMIN_ID"))]:  # заглушка
-#                 file_stream.seek(0)
-#                 await context.bot.send_document(chat_id=admin_id, document=file_stream, filename=filename)
-
-#     # Очистка
-#     context.user_data.clear()
-
-#     # Возврат в стартовое меню
-#     logo_bytes_start = get_logo_bytes()
-#     logo_file = InputFile(logo_bytes_start, filename="logo.png")
-#     keyboard = [[InlineKeyboardButton("Start / Почати", callback_data="main_menu")]]
-#     reply_markup = InlineKeyboardMarkup(keyboard)
-#     await update.message.reply_photo(photo=logo_file, caption="Welcome to NPA Fleet bot 🚗\nЛаскаво просимо в NPA Fleet бот", reply_markup=reply_markup)
-
-#     return ConversationHandler.END
 
 
 
@@ -660,8 +615,7 @@ async def description_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
             file_stream.seek(0)
             await context.bot.send_document(chat_id=user_id, document=file_stream, filename=filename)
         
-        if location != "Shyroke":
-            logging.info(f"[TEST MODE] Excel would be sent to manager for {location}")
+        
 
     # Очистка данных пользователя
     context.user_data.clear()
