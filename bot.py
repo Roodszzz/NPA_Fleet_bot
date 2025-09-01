@@ -5,7 +5,6 @@ from io import BytesIO
 from datetime import datetime
 from unidecode import unidecode
 from dotenv import load_dotenv
-
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler,
@@ -15,6 +14,7 @@ from openpyxl import load_workbook
 from openpyxl.drawing.image import Image
 from openpyxl.styles import Alignment
 from googletrans import Translator
+import math
 
 # =================== Загрузка переменных ===================
 load_dotenv()
@@ -42,9 +42,6 @@ def get_workbook(report_type="LDR"):
         filename = "LDR.xlsx"
     return load_workbook(os.path.join(current_dir, "excel", filename))
 
-# def get_workbook():
-#     current_dir = os.path.dirname(__file__)
-#     return load_workbook(os.path.join(current_dir, "excel", "LDR.xlsx"))
 
 def get_logo_bytes():
     current_dir = os.path.dirname(__file__)
@@ -76,17 +73,17 @@ def auto_adjust(ws, cells):
 # =================== Главное меню ===================
 async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
-        [InlineKeyboardButton("LDR | Lost / Damage report | Втрачено або пошкоджено", callback_data="ldr")],
-        [InlineKeyboardButton("MFR | Mechanical failure report | Механічне пошкодження авто", callback_data="mfr")],
+        [InlineKeyboardButton("LDR (Lost / Damage) | Втрачено або пошкоджено", callback_data="ldr")],
+        [InlineKeyboardButton("MFR (Mechanical failure) | Механічне пошкодження авто", callback_data="mfr")],
         [InlineKeyboardButton("VAR | ВАР", callback_data="var")],
         [InlineKeyboardButton("Contacts | Контакти", callback_data="contacts")],
         [InlineKeyboardButton("Other questions | Інші питання", callback_data="other_questions")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    text = ("🌍 EN\n"
+    text = ("🇬🇧 EN\n"
             "Hello! This is the NPA Fleet bot 🚗\n"
             "I can help you create reports for vehicles.\n\n"
-            "🌍 UA\n"
+            "🇺🇦 UA\n"
             "Привіт! Це бот NPA Fleet 🚗\n"
             "Я допоможу вам створювати звіти по автомобілях.\n\n"
             "What are you interested in today? / Що вас цікавить сьогодні?"
@@ -128,29 +125,14 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 MANAGERS = {
     "Shyroke": [ADMIN_ID],
-    "Mykolaiv": [431019082],
+    "Mykolaiv": [ADMIN_ID],
 }
 
 
 
 
 
-
-
-
-
-
-
 # =================== LDR ===================
-
-
-
-
-
-
-
-
-
 
 
 
@@ -225,7 +207,7 @@ async def serial_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     set_cell(ws, "D4", text)
     keyboard = [[InlineKeyboardButton(x, callback_data=x)] for x in ["LOGS","MTT","MDD","TFM","QA","NTS"]]
     keyboard.append([InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")])
-    await update.message.reply_text("Choose Allocation | Оберіть Allocation:", reply_markup=InlineKeyboardMarkup(keyboard))
+    await update.message.reply_text("Choose Allocation | Оберіть Розподіл:", reply_markup=InlineKeyboardMarkup(keyboard))
     return ALLOCATION
 
 async def allocation_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -274,7 +256,7 @@ async def allocation_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYP
     try: await query.message.delete()
     except: pass
     await query.message.reply_text(
-        "Enter your full name | Введіть ваше ПІБ:",
+        "Enter your full name | Введіть ваше Ім'я та прізвище:",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]])
     )
     return USER
@@ -310,6 +292,28 @@ async def user_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =================== Описание ===================
 
 
+from openpyxl.styles import Alignment
+import math
+
+def auto_height_for_cell(ws, cell_address):
+    cell = ws[cell_address]
+    cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+
+    # Получаем ширину колонки в символах (приближённо)
+    col_letter = ''.join(filter(str.isalpha, cell_address))
+    col_width = ws.column_dimensions[col_letter].width or 10  # если не задано, ставим 10
+
+    # Оценка количества строк: длина текста / ширина колонки
+    text_length = len(str(cell.value))
+    lines_needed = math.ceil(text_length / col_width)
+
+    # Стандартная высота одной строки ~15
+    ws.row_dimensions[cell.row].height = lines_needed * 15
+
+# Пример использования в твоей функции:
+
+
+
 async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if not text:
@@ -318,9 +322,20 @@ async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TY
 
     text_en = await translate_to_en(text)
     ws = context.user_data['ws']
-    set_cell(ws, "A9", text_en)
-    auto_adjust(ws, ["B4","D4","B6","D6","F4","A10","A9","B10"])
 
+    # Вставка текста в A9 с переносом и выравниванием по левому краю
+    cell = ws["A9"]
+    cell.value = text_en
+    from openpyxl.styles import Alignment
+    cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+
+    # Авто-высота строки для A9 с минимальной высотой
+    auto_height_for_cell(ws, "A9", min_height=200)
+
+    # Подгоняем размеры остальных ячеек
+    auto_adjust(ws, ["B4","D4","B6","D6","F4","A10","B10"])
+
+    # Логотип
     logo_path = os.path.join(os.path.dirname(__file__), "logo", "Лого ексель.png")
     img = Image(logo_path)
     img.width, img.height = 396, 72
@@ -329,11 +344,11 @@ async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TY
     plate = ws["D4"].value or "CAR"
     filename = f"LDR_{plate}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.xlsx"
 
-    # Отправка только менеджеру по локации
+    # Отправка менеджерам по локации
     location = context.user_data.get("location")
     manager_ids = MANAGERS.get(location, [])
     for manager_id in manager_ids:
-        file_stream = BytesIO()  # новый поток для каждого менеджера
+        file_stream = BytesIO()
         ws.parent.save(file_stream)
         file_stream.seek(0)
         await context.bot.send_document(chat_id=manager_id, document=file_stream, filename=filename)
@@ -341,10 +356,10 @@ async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TY
 
     context.user_data.clear()
 
-    # Пользователю только уведомление
-    await update.message.reply_text("✅ Your report has been sent to the manager / Звіт надіслано менеджеру")
+    # Уведомление пользователю
+    await update.message.reply_text("✅ Your report has been sent! / ✅ Звіт надіслано!")
 
-    # Отправка приветственного фото с кнопкой
+    # Приветственное фото с кнопкой
     logo_bytes_start = get_logo_bytes()
     logo_file = InputFile(logo_bytes_start, filename="logo.png")
     keyboard = [[InlineKeyboardButton("Start | Почати", callback_data="main_menu")]]
@@ -355,35 +370,20 @@ async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 
+# Функция для авто-подгонки высоты строки A9 с минимальной защитой
+def auto_height_for_cell(ws, cell_address, min_height=30):
+    """Автоматическая высота строки под содержимое, но не меньше min_height"""
+    cell = ws[cell_address]
+    row = cell.row
+    lines = str(cell.value).count('\n') + 1
+    # Расчет высоты: 15 пикселей на строку
+    height = max(lines * 15, min_height)
+    ws.row_dimensions[row].height = height
 
 
-# async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     text = update.message.text.strip()
-#     if not text:
-#         await update.message.reply_text("❌ Describe the situation / ❌ Опишіть ситуацію")
-#         return DESCRIPTION
-#     text_en = await translate_to_en(text)
-#     ws = context.user_data['ws']
-#     set_cell(ws, "A9", text_en)
-#     auto_adjust(ws, ["B4","D4","B6","D6","F4","A10","A9","B10"])
-#     logo_path = os.path.join(os.path.dirname(__file__), "logo", "Лого ексель.png")
-#     img = Image(logo_path)
-#     img.width, img.height = 396, 72
-#     ws.add_image(img, "A1")
-#     plate = ws["D4"].value or "CAR"
-#     filename = f"LDR_{plate}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.xlsx"
-#     file_stream = BytesIO()
-#     ws.parent.save(file_stream)
-#     file_stream.seek(0)
-#     await update.message.reply_document(document=file_stream, filename=filename)
-#     await update.message.reply_text("✅ File sent / ✅ Файл відправлено")
-#     context.user_data.clear()
-#     logo_bytes_start = get_logo_bytes()
-#     logo_file = InputFile(logo_bytes_start, filename="logo.png")
-#     keyboard = [[InlineKeyboardButton("Start | Почати", callback_data="main_menu")]]
-#     reply_markup = InlineKeyboardMarkup(keyboard)
-#     await update.message.reply_photo(photo=logo_file, caption="Welcome to NPA Fleet bot 🚗", reply_markup=reply_markup)
-#     return ConversationHandler.END
+
+
+
 
 # =================== Заглушки ===================
 async def generic_stub(update: Update, context: ContextTypes.DEFAULT_TYPE, name="Function"):
@@ -396,25 +396,12 @@ async def generic_stub(update: Update, context: ContextTypes.DEFAULT_TYPE, name=
 
 
 async def var_callback(update: Update, context: ContextTypes.DEFAULT_TYPE): return await generic_stub(update, context, "VAR / ВАР")
-async def contacts_callback(update: Update, context: ContextTypes.DEFAULT_TYPE): return await generic_stub(update, context, "Contacts / Контакти")
+#async def contacts_callback(update: Update, context: ContextTypes.DEFAULT_TYPE): return await generic_stub(update, context, "Contacts / Контакти")
 async def other_questions_callback(update: Update, context: ContextTypes.DEFAULT_TYPE): return await generic_stub(update, context, "Other questions / Інші питання")
 
 
 
 #=====================================================MFR==================================================
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -597,7 +584,7 @@ async def team_number_input_mfr(update: Update, context: ContextTypes.DEFAULT_TY
     ws = context.user_data['ws']
     allocation = context.user_data.get('allocation')
     set_cell(ws, "F9", f"{allocation}-{text}")
-    await update.message.reply_text("Enter your full name | Введіть ПІБ:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]]))
+    await update.message.reply_text("Enter your full name | Введіть Ім'я та прізвище:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]]))
     return USER
 
 async def user_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -618,170 +605,7 @@ async def user_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return DESCRIPTION
 
 # =================== Описание ===================
-# async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     text = update.message.text.strip()
-#     if not text:
-#         await update.message.reply_text("❌ Describe the situation / ❌ Опишіть ситуацію")
-#         return DESCRIPTION
-#     text_en = await translate_to_en(text)
-#     ws = context.user_data['ws']
-#     set_cell(ws, "B15", text_en)
-#     auto_adjust(ws, ["F5", "C5", "C8", "F8", "I5", "F22", "C22", "B15"])
-#     logo_path = os.path.join(os.path.dirname(__file__), "logo", "Лого ексель.png")
-#     img = Image(logo_path)
-#     img.width, img.height = 396, 72
-#     ws.add_image(img, "A1")
-#     plate = ws["F5"].value or "CAR"
-#     filename = f"MFR_{plate}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.xlsx"
-#     file_stream = BytesIO()
-#     ws.parent.save(file_stream)
-#     file_stream.seek(0)
-#     await update.message.reply_document(document=file_stream, filename=filename)
-#     await update.message.reply_text("✅ File sent / ✅ Файл відправлено")
-#     context.user_data.clear()
-#     logo_bytes_start = get_logo_bytes()
-#     logo_file = InputFile(logo_bytes_start, filename="logo.png")
-#     keyboard = [[InlineKeyboardButton("Start / Почати", callback_data="main_menu")]]
-#     reply_markup = InlineKeyboardMarkup(keyboard)
-#     await update.message.reply_photo(photo=logo_file, caption="Welcome to NPA Fleet bot 🚗", reply_markup=reply_markup)
-#     return ConversationHandler.END
 
-
-
-# async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     text = update.message.text.strip()
-#     if not text:
-#         await update.message.reply_text("❌ Describe the situation / ❌ Опишіть ситуацію")
-#         return DESCRIPTION
-
-#     text_en = await translate_to_en(text)
-#     ws = context.user_data['ws']
-#     set_cell(ws, "B15", text_en)
-#     auto_adjust(ws, ["F5", "C5", "C8", "F8", "I5", "F22", "C22", "B15"])
-
-#     logo_path = os.path.join(os.path.dirname(__file__), "logo", "Лого ексель.png")
-#     img = Image(logo_path)
-#     img.width, img.height = 396, 72
-#     ws.add_image(img, "A1")
-
-#     plate = ws["F5"].value or "CAR"
-#     filename = f"MFR_{plate}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.xlsx"
-
-#     # Отправка только менеджеру по локации
-#     location = context.user_data.get("location")
-#     manager_ids = MANAGERS.get(location, [])
-#     for manager_id in manager_ids:
-#         file_stream = BytesIO()  # новый поток для каждого менеджера
-#         ws.parent.save(file_stream)
-#         file_stream.seek(0)
-#         await context.bot.send_document(chat_id=manager_id, document=file_stream, filename=filename)
-#         await context.bot.send_message(chat_id=manager_id, text=f"📄 Новий звіт по локації {location}")
-
-#     context.user_data.clear()
-
-#     # Пользователю только уведомление
-#     await update.message.reply_text("✅ Your report has been sent to the manager / Звіт надіслано менеджеру")
-#     return ConversationHandler.END
-
-# async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     text = update.message.text.strip()
-#     if not text:
-#         await update.message.reply_text("❌ Describe the situation / ❌ Опишіть ситуацію")
-#         return DESCRIPTION
-
-#     text_en = await translate_to_en(text)
-#     ws = context.user_data['ws']
-#     set_cell(ws, "B15", text_en)
-#     auto_adjust(ws, ["F5", "C5", "C8", "F8", "I5", "F22", "C22", "B15"])
-
-#     logo_path = os.path.join(os.path.dirname(__file__), "logo", "Лого ексель.png")
-#     img = Image(logo_path)
-#     img.width, img.height = 396, 72
-#     ws.add_image(img, "B1")
-
-#     plate = ws["F5"].value or "CAR"
-#     filename = f"MFR_{plate}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.xlsx"
-
-#     # Отправка только менеджеру по локации
-#     location = context.user_data.get("location")
-#     manager_ids = MANAGERS.get(location, [])
-#     for manager_id in manager_ids:
-#         file_stream = BytesIO()  # создаем новый поток для каждого менеджера
-#         ws.parent.save(file_stream)
-#         file_stream.seek(0)
-#         await context.bot.send_document(chat_id=manager_id, document=file_stream, filename=filename)
-#         await context.bot.send_message(chat_id=manager_id, text=f"📄 Новий MFR звіт по локації {location}")
-
-#     context.user_data.clear()
-
-#     # Пользователю только уведомление
-#     await update.message.reply_text("✅ Your report has been sent to the manager / Звіт надіслано менеджеру")
-
-#     # Отправка приветственного фото с кнопкой
-#     logo_bytes_start = get_logo_bytes()
-#     logo_file = InputFile(logo_bytes_start, filename="logo.png")
-#     keyboard = [[InlineKeyboardButton("Start | Почати", callback_data="main_menu")]]
-#     reply_markup = InlineKeyboardMarkup(keyboard)
-#     await update.message.reply_photo(photo=logo_file, caption="Welcome to NPA Fleet bot 🚗", reply_markup=reply_markup)
-
-#     return ConversationHandler.END
-
-
-# async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     text = update.message.text.strip()
-#     if not text:
-#         await update.message.reply_text("❌ Describe the situation / ❌ Опишіть ситуацію")
-#         return DESCRIPTION
-
-#     text_en = await translate_to_en(text)
-#     ws = context.user_data['ws']
-
-#     # --- Текст с переносом ---
-#     cell = ws["B15"]
-#     cell.value = text_en
-#     cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
-
-#     # --- Фиксируем ширину колонки ---
-#     ws.column_dimensions["B"].width = 50  # можно подкорректировать ширину
-
-#     # --- Подгоняем высоту строки ---
-#     approx_char_per_line = 50  # примерно символов в строке
-#     lines = (len(text_en) // approx_char_per_line) + 1
-#     ws.row_dimensions[cell.row].height = lines * 15  # высота строки
-
-#     # --- Остальные ячейки авто ---
-#     auto_adjust(ws, ["F5", "C5", "C8", "F8", "I5", "F22", "C22"])
-
-#     # --- Лого ---
-#     logo_path = os.path.join(os.path.dirname(__file__), "logo", "Лого ексель.png")
-#     img = Image(logo_path)
-#     img.width, img.height = 396, 72
-#     ws.add_image(img, "B1")
-
-#     plate = ws["F5"].value or "CAR"
-#     filename = f"MFR_{plate}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.xlsx"
-
-#     # --- Отправка менеджеру ---
-#     location = context.user_data.get("location")
-#     manager_ids = MANAGERS.get(location, [])
-#     for manager_id in manager_ids:
-#         file_stream = BytesIO()
-#         ws.parent.save(file_stream)
-#         file_stream.seek(0)
-#         await context.bot.send_document(chat_id=manager_id, document=file_stream, filename=filename)
-#         await context.bot.send_message(chat_id=manager_id, text=f"📄 Новий MFR звіт по локації {location}")
-
-#     context.user_data.clear()
-#     await update.message.reply_text("✅ Your report has been sent to the manager / Звіт надіслано менеджеру")
-
-#     # --- Приветственное фото ---
-#     logo_bytes_start = get_logo_bytes()
-#     logo_file = InputFile(logo_bytes_start, filename="logo.png")
-#     keyboard = [[InlineKeyboardButton("Start | Почати", callback_data="main_menu")]]
-#     reply_markup = InlineKeyboardMarkup(keyboard)
-#     await update.message.reply_photo(photo=logo_file, caption="Welcome to NPA Fleet bot 🚗", reply_markup=reply_markup)
-
-#     return ConversationHandler.END
 
 
 async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -793,34 +617,14 @@ async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TY
     text_en = await translate_to_en(text)
     ws = context.user_data['ws']
 
-    # --- Определяем диапазон для текстового блока ---
-    start_row = 16
-    end_row = 21
-    col = "B"
-    max_chars_per_line = 150  # примерная длина строки
+    # --- Записываем текст в одну ячейку и выравниваем ---
+    ws["B16"] = text_en
+    ws["B16"].alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
 
-    # --- Разбиваем текст на строки ---
-    words = text_en.split()
-    lines = []
-    current_line = ""
-    for word in words:
-        if len(current_line) + len(word) + 1 <= max_chars_per_line:
-            current_line += (" " if current_line else "") + word
-        else:
-            lines.append(current_line)
-            current_line = word
-    if current_line:
-        lines.append(current_line)
+    # --- Автоподгонка высоты ячейки под текст ---
+    auto_height_for_cell(ws, "B16", min_height=100)
 
-    # --- Записываем в ячейки ---
-    for i, row in enumerate(range(start_row, end_row + 1)):
-        if i < len(lines):
-            ws[f"{col}{row}"].value = lines[i]
-            ws[f"{col}{row}"].alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
-        else:
-            ws[f"{col}{row}"].value = ""
-    
-    # --- Остальные ячейки авто ---
+    # --- Подгонка остальных ячеек ---
     auto_adjust(ws, ["F6", "C6", "C9", "F9", "I6", "F23", "C23"])
 
     # --- Лого ---
@@ -843,7 +647,7 @@ async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TY
         await context.bot.send_message(chat_id=manager_id, text=f"📄 Новий MFR звіт по локації {location}")
 
     context.user_data.clear()
-    await update.message.reply_text("✅ Your report has been sent to the manager / Звіт надіслано менеджеру")
+    await update.message.reply_text("✅ Your report has been sent! / ✅ Звіт надіслано!")
 
     # --- Приветственное фото ---
     logo_bytes_start = get_logo_bytes()
@@ -856,24 +660,175 @@ async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 
+#=============================================================MFR END=============================================================
+
+
+#==============================================================VAR============================================================
+#==============================================================VAR END=========================================================
 
 
 
 
+#===================================================================CONTACTS====================================================
+
+
+async def contacts_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    # Если нажата кнопка "Назад", возвращаемся в главное меню
+    if query.data == "back":
+        try:
+            await query.message.delete()
+        except:
+            pass
+        await main_menu(update, context)  # вызываем функцию главного меню
+        return
+
+    text = (
+        "📌 Locations / Локації:\n"
+        "Select a location to see contacts | Оберіть локацію для контактів:"
+    )
+
+    keyboard = [
+        [
+            InlineKeyboardButton("Shyroke | Широке", callback_data="contact_shyroke"),
+            InlineKeyboardButton("Mykolaiv | Миколаїв", callback_data="contact_mykolaiv"),
+        ],
+        [InlineKeyboardButton("❌ Back | Назад", callback_data="back")]
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    try:
+        await query.message.delete()
+    except:
+        pass
+    await query.message.reply_text(text=text, reply_markup=reply_markup)
 
 
 
+#Обработчик конкретной локации
+async def contact_location_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+
+    if data == "back":
+        try: await query.message.delete()
+        except: pass
+        await main_menu(update, context)
+        return
+
+    if data == "contact_shyroke":
+        text = (
+            "📌 Shyroke | Широке\n"
+            "👤 F.A. Oleksandr Rudnov | F.A. Олександр Руднов\n"
+            "📞 Phone: +380 431 019 082\n"
+            "🌐 Map: https://goo.gl/maps/example1"
+        )
+        keyboard = [
+            [InlineKeyboardButton("Car Wash | Мийка", url="https://goo.gl/maps/carwash_shyroke")],
+            [InlineKeyboardButton("Tire Service | Шиномонтаж", url="https://goo.gl/maps/tire_shyroke")],
+            [InlineKeyboardButton("❌ Back | Назад", callback_data="contacts")]
+        ]
+    elif data == "contact_mykolaiv":
+        text = (
+            "📌 Mykolaiv | Миколаїв\n"
+            "👤 F.A. Andriy Padalka | F.A. Андрій Падалка\n"
+            "📞 Phone: +380 431 019 083\n"
+            "🌐 Map: https://goo.gl/maps/example2"
+        )
+        keyboard = [
+            [InlineKeyboardButton("Car Wash | Мийка", url="https://goo.gl/maps/carwash_mykolaiv")],
+            [InlineKeyboardButton("Tire Service | Шиномонтаж", url="https://goo.gl/maps/tire_mykolaiv")],
+            [InlineKeyboardButton("❌ Back | Назад", callback_data="contacts")]
+        ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    try: await query.message.delete()
+    except: pass
+    await query.message.reply_text(text=text, reply_markup=reply_markup)
+
+
+#Контакты по локациям
+LOCATIONS = {
+    "shyroke": {
+        "manager": "F.A. Oleksandr Rudnov | F.A. Олександр Руднов",
+        "phone": "+380 431 019 082",
+        "map": "https://goo.gl/maps/example1",
+        "car_washes": [
+            {"name": "Car Wash 1", "phone": "+380 431 000 001", "map": "https://goo.gl/maps/carwash1_shyroke"},
+            {"name": "Car Wash 2", "phone": "+380 431 000 002", "map": "https://goo.gl/maps/carwash2_shyroke"},
+        ],
+        "tire_services": [
+            {"name": "Tire Service 1", "phone": "+380 431 111 001", "map": "https://goo.gl/maps/tire1_shyroke"},
+            {"name": "Tire Service 2", "phone": "+380 431 111 002", "map": "https://goo.gl/maps/tire2_shyroke"},
+        ],
+    },
+    "mykolaiv": {
+        "manager": "F.A. Andriy Padalka | F.A. Андрій Падалка",
+        "phone": "+380 431 019 083",
+        "map": "https://goo.gl/maps/example2",
+        "car_washes": [
+            {"name": "Car Wash 1", "phone": "+380 432 000 001", "map": "https://goo.gl/maps/carwash1_mykolaiv"},
+            {"name": "Car Wash 2", "phone": "+380 432 000 002", "map": "https://goo.gl/maps/carwash2_mykolaiv"},
+        ],
+        "tire_services": [
+            {"name": "Tire Service 1", "phone": "+380 432 111 001", "map": "https://goo.gl/maps/tire1_mykolaiv"},
+            {"name": "Tire Service 2", "phone": "+380 432 111 002", "map": "https://goo.gl/maps/tire2_mykolaiv"},
+        ],
+    }
+}
+
+
+async def contact_location_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+
+    if data == "back":
+        try: await query.message.delete()
+        except: pass
+        await contacts_callback(update, context)
+        return
+
+    loc_key = None
+    action = None
+
+    if data.startswith("contact_"):
+        loc_key = data.split("_")[1]  # shyroke или mykolaiv
+        text = f"📌 {loc_key.capitalize()} | {loc_key.capitalize()}\n" \
+               f"👤 {LOCATIONS[loc_key]['manager']}\n" \
+               f"📞 Phone: {LOCATIONS[loc_key]['phone']}\n" \
+               f"🌐 Map: {LOCATIONS[loc_key]['map']}"
+        keyboard = [
+            [InlineKeyboardButton("Car Wash | Мийка", callback_data=f"{loc_key}_carwash")],
+            [InlineKeyboardButton("Tire Service | Шиномонтаж", callback_data=f"{loc_key}_tire")],
+            [InlineKeyboardButton("❌ Back | Назад", callback_data="contacts")]
+        ]
+    elif data.endswith("_carwash"):
+        loc_key = data.split("_")[0]
+        text = "🧼 Car Washes | Мийки:\n\n"
+        for wash in LOCATIONS[loc_key]["car_washes"]:
+            text += f"{wash['name']}\nPhone: {wash['phone']}\nMap: {wash['map']}\n\n"
+        keyboard = [[InlineKeyboardButton("❌ Back | Назад", callback_data=f"contact_{loc_key}")]]
+    elif data.endswith("_tire"):
+        loc_key = data.split("_")[0]
+        text = "🔧 Tire Services | Шиномонтажі:\n\n"
+        for tire in LOCATIONS[loc_key]["tire_services"]:
+            text += f"{tire['name']}\nPhone: {tire['phone']}\nMap: {tire['map']}\n\n"
+        keyboard = [[InlineKeyboardButton("❌ Back | Назад", callback_data=f"contact_{loc_key}")]]
+    else:
+        return
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    try: await query.message.delete()
+    except: pass
+    await query.message.reply_text(text=text, reply_markup=reply_markup)
 
 
 
-
-
-
-
-
-
-
-
+#===================================================================CONTACTS END====================================================
 
 
 
@@ -940,6 +895,14 @@ def main():
     app.add_handler(CallbackQueryHandler(contacts_callback, pattern="contacts"))
     app.add_handler(CallbackQueryHandler(other_questions_callback, pattern="other_questions"))
     app.add_handler(CallbackQueryHandler(cancel, pattern="cancel"))
+    # app.add_handler(CallbackQueryHandler(contacts_callback, pattern="^contacts$"))
+    # app.add_handler(CallbackQueryHandler(contact_location_callback, pattern="^contact_shyroke$|^contact_mykolaiv$|^back$"))
+
+
+
+    app.add_handler(CallbackQueryHandler(contacts_callback, pattern="^contacts$"))
+    app.add_handler(CallbackQueryHandler(contact_location_callback, pattern="^contact_shyroke$|^contact_mykolaiv$|^shyroke_carwash$|^shyroke_tire$|^mykolaiv_carwash$|^mykolaiv_tire$|^back$"))
+
 
     app.run_polling()
 
