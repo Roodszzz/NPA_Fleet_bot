@@ -16,6 +16,8 @@ from openpyxl.styles import Alignment
 from googletrans import Translator
 import math
 
+
+
 # =================== Загрузка переменных ===================
 load_dotenv()
 TOKEN = os.getenv("TOKEN")
@@ -71,22 +73,6 @@ def auto_adjust(ws, cells):
             )
 
 
-ALLOWED_USERS = list(map(int, os.getenv("ALLOWED_USERS", "").split(",")))
-
-
-async def is_allowed(update: Update) -> bool:
-    user_id = update.effective_user.id
-    if user_id not in ALLOWED_USERS:
-        if update.message:
-            await update.message.reply_text("⛔ У вас немає доступу до цього бота.")
-        elif update.callback_query:
-            await update.callback_query.answer("⛔ Доступ заборонений", show_alert=True)
-        return False
-    return True
-
-
-
-
 # =================== Главное меню ===================
 async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
@@ -114,21 +100,53 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(text=text, reply_markup=reply_markup)
 
 # =================== Старт ===================
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_allowed(update):
-        return ConversationHandler.END  # сразу выходим, если нет доступа
+ALLOWED_USERS = [507775858, 123456789]  # твои разрешённые ID
 
+
+def restricted(func):
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        user_id = update.effective_user.id
+        if user_id not in ALLOWED_USERS:
+            if update.message:
+                await update.message.reply_text("⛔ Доступ заборонений")
+            elif update.callback_query:
+                await update.callback_query.answer()
+                await update.callback_query.message.reply_text("⛔ Доступ заборонений")
+            return
+        return await func(update, context, *args, **kwargs)
+    return wrapper
+
+
+@restricted
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in ALLOWED_USERS:
+        if update.message:
+            await update.message.reply_text("⛔ Доступ заборонений")
+        elif update.callback_query:
+            await update.callback_query.answer()
+            await update.callback_query.message.reply_text("⛔ Доступ заборонений")
+        return  # прекращаем выполнение, дальше ничего не делаем
+
+    # очищаем user_data
     context.user_data.clear()
+
+    # готовим фото
     logo_bytes = get_logo_bytes()
     logo_file = InputFile(logo_bytes, filename="logo.png")
     keyboard = [[InlineKeyboardButton("Start | Почати", callback_data="main_menu")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # отправляем фото
     if update.message:
         await update.message.reply_photo(photo=logo_file, caption="Welcome to NPA Fleet bot 🚗", reply_markup=reply_markup)
     elif update.callback_query:
         await update.callback_query.answer()
         await update.callback_query.message.reply_photo(photo=logo_file, caption="Welcome to NPA Fleet bot 🚗", reply_markup=reply_markup)
 
+@restricted
+async def start_button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await main_menu(update, context)
 
 # =================== Cancel ===================
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -154,7 +172,7 @@ MANAGERS = {
 
 
 
-
+@restricted
 async def ldr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -168,7 +186,7 @@ async def ldr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try: await query.message.delete()
     except: pass
     await query.message.reply_text("Choose request type | Виберіть тип звернення:", reply_markup=InlineKeyboardMarkup(keyboard))
-
+@restricted
 async def ldr_request_type_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -412,9 +430,9 @@ async def generic_stub(update: Update, context: ContextTypes.DEFAULT_TYPE, name=
     except: pass
     await query.message.reply_text(f"You selected {name}. Function in progress.", reply_markup=InlineKeyboardMarkup(keyboard))
 
-
+@restricted
 async def var_callback(update: Update, context: ContextTypes.DEFAULT_TYPE): return await generic_stub(update, context, "VAR / ВАР")
-#async def contacts_callback(update: Update, context: ContextTypes.DEFAULT_TYPE): return await generic_stub(update, context, "Contacts / Контакти")
+@restricted
 async def other_questions_callback(update: Update, context: ContextTypes.DEFAULT_TYPE): return await generic_stub(update, context, "Other questions / Інші питання")
 
 
@@ -428,6 +446,7 @@ ALLOCATION, MODEL_SELECTION, SERIAL, TEAM_NUMBER, USER, DESCRIPTION = range(6)
 
 
 # Начало MFR запроса — спрашиваем локацию
+@restricted
 async def mfr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -689,7 +708,7 @@ async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TY
 
 #===================================================================CONTACTS====================================================
 
-
+@restricted
 async def contacts_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -726,6 +745,7 @@ async def contacts_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 #Обработчик конкретной локации
+@restricted
 async def contact_location_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -798,7 +818,7 @@ LOCATIONS = {
     }
 }
 
-
+@restricted
 async def contact_location_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
