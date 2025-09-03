@@ -10,11 +10,14 @@ from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler,
     MessageHandler, ConversationHandler, filters, ContextTypes
 )
+
 from openpyxl import load_workbook
 from openpyxl.drawing.image import Image
 from openpyxl.styles import Alignment
 from googletrans import Translator
 import math
+
+
 
 # =================== Загрузка переменных ===================
 load_dotenv()
@@ -71,30 +74,13 @@ def auto_adjust(ws, cells):
             )
 
 
-ALLOWED_USERS = list(map(int, os.getenv("ALLOWED_USERS", "").split(",")))
-
-
-async def is_allowed(update: Update) -> bool:
-    user_id = update.effective_user.id
-    if user_id not in ALLOWED_USERS:
-        if update.message:
-            await update.message.reply_text("⛔ У вас немає доступу до цього бота.")
-        elif update.callback_query:
-            await update.callback_query.answer("⛔ Доступ заборонений", show_alert=True)
-        return False
-    return True
-
-
-
-
 # =================== Главное меню ===================
 async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("LDR (Lost / Damage) | Втрачено або пошкоджено", callback_data="ldr")],
         [InlineKeyboardButton("MFR (Mechanical failure) | Механічне пошкодження авто", callback_data="mfr")],
-        [InlineKeyboardButton("VAR | ВАР", callback_data="var")],
         [InlineKeyboardButton("Contacts | Контакти", callback_data="contacts")],
-        [InlineKeyboardButton("Other questions | Інші питання", callback_data="other_questions")]
+        #[InlineKeyboardButton("Other questions | Інші питання", callback_data="other_questions")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     text = ("🇬🇧 EN\n"
@@ -114,23 +100,59 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(text=text, reply_markup=reply_markup)
 
 # =================== Старт ===================
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_allowed(update):
-        return ConversationHandler.END  # сразу выходим, если нет доступа
+ALLOWED_USERS = {
+    507775858: "Oleksandr Rudnov",
+    6093640376: "Roman Kucherevskyi",
+}
 
+
+def restricted(func):
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        user_id = update.effective_user.id
+        if user_id not in ALLOWED_USERS:
+            if update.message:
+                await update.message.reply_text("⛔ Доступ заборонений")
+            elif update.callback_query:
+                await update.callback_query.answer()
+                await update.callback_query.message.reply_text("⛔ Доступ заборонений")
+            return
+        return await func(update, context, *args, **kwargs)
+    return wrapper
+
+
+@restricted
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in ALLOWED_USERS:
+        if update.message:
+            await update.message.reply_text("⛔ Доступ заборонений")
+        elif update.callback_query:
+            await update.callback_query.answer()
+            await update.callback_query.message.reply_text("⛔ Доступ заборонений")
+        return  # прекращаем выполнение, дальше ничего не делаем
+
+    # очищаем user_data
     context.user_data.clear()
+
+    # готовим фото
     logo_bytes = get_logo_bytes()
     logo_file = InputFile(logo_bytes, filename="logo.png")
     keyboard = [[InlineKeyboardButton("Start | Почати", callback_data="main_menu")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # отправляем фото
     if update.message:
         await update.message.reply_photo(photo=logo_file, caption="Welcome to NPA Fleet bot 🚗", reply_markup=reply_markup)
     elif update.callback_query:
         await update.callback_query.answer()
         await update.callback_query.message.reply_photo(photo=logo_file, caption="Welcome to NPA Fleet bot 🚗", reply_markup=reply_markup)
 
+@restricted
+async def start_button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await main_menu(update, context)
 
 # =================== Cancel ===================
+@restricted
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     if update.callback_query:
@@ -143,18 +165,30 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 MANAGERS = {
     "Shyroke": [ADMIN_ID],
-    "Mykolaiv": [ADMIN_ID],
+    "Mykolaiv": [6093640376],
 }
 
 
 
 
 
-# =================== LDR ===================
 
 
 
 
+
+
+
+
+# ================================================================== LDR ========================================================================================================
+SERIAL = 1
+ALLOCATION = 2
+TEAM_NUMBER = 3
+USER = 4
+DESCRIPTION = 5
+OTHER_REQUEST_INPUT = 6
+
+@restricted
 async def ldr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -162,36 +196,43 @@ async def ldr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("Flat tire | Пошкоджене колесо", callback_data="flat_tire")],
         [InlineKeyboardButton("Wipers replacement | Заміна дворників", callback_data="wipers")],
         [InlineKeyboardButton("Driver's card | Водійська карта", callback_data="Drivers_card")],
-        [InlineKeyboardButton("Other request | Інше звернення", callback_data="other_request")],
+        [InlineKeyboardButton("Other damage | Інше пошкодження", callback_data="other_request")],
         [InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]
     ]
     try: await query.message.delete()
     except: pass
     await query.message.reply_text("Choose request type | Виберіть тип звернення:", reply_markup=InlineKeyboardMarkup(keyboard))
 
+
+@restricted
 async def ldr_request_type_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
+
     if data == "cancel":
         return await cancel(update, context)
-    if data == "other_request":
-        await query.message.reply_text("You chose: Other request | Ви обрали: Інше звернення.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]]))
-        return ConversationHandler.END
-    
 
     context.user_data['wb'] = get_workbook("LDR")
     context.user_data['ws'] = context.user_data['wb'].active
-
-    # context.user_data['wb'] = get_workbook()
-    # context.user_data['ws'] = context.user_data['wb'].active
     ws = context.user_data['ws']
+
+    if data == "other_request":
+        try: await query.message.delete()
+        except: pass
+        await query.message.reply_text(
+            "Please indicate what is damaged: \nВкажіть, що пошкоджено:"
+        )
+        return OTHER_REQUEST_INPUT  # <-- возвращаем константу, а не строку
+
+    # Старые варианты кнопок с готовыми фразами
     if data == "flat_tire":
         set_cell(ws, "B4", "Flat tyre | Пошкоджене колесо")
     elif data == "wipers":
         set_cell(ws, "B4", "Wipers replacement | Заміна дворників")
     elif data == "Drivers_card":
         set_cell(ws, "B4", "Driver's card | Водійська карта")    
+
     set_cell(ws, "D4", "Serial / ID / Серійний номер / ID")
 
     keyboard = [
@@ -201,7 +242,49 @@ async def ldr_request_type_callback(update: Update, context: ContextTypes.DEFAUL
     ]
     try: await query.message.delete()
     except: pass
-    await query.message.reply_text("Select vehicle location | Оберіть локацію автомобіля:", reply_markup=InlineKeyboardMarkup(keyboard))
+    await query.message.reply_text(
+        "Select vehicle location | Оберіть локацію автомобіля:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    return ALLOCATION
+
+
+
+# Новый хэндлер для ввода текста пользователем
+from googletrans import Translator
+
+translator = Translator()
+
+async def translate_to_en(text: str) -> str:
+    # Асинхронно вызываем перевод
+    translated = await translator.translate(text, dest='en')
+    return translated.text
+
+@restricted
+async def ldr_other_request_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_text = update.message.text.strip()
+    if not user_text:
+        await update.message.reply_text("❌ Please type your request / ❌ Введіть ваше звернення")
+        return OTHER_REQUEST_INPUT
+
+    ws = context.user_data['ws']
+
+    # Перевод на английский
+    translated_text = await translate_to_en(user_text)
+
+    # Записываем перевод в Excel
+    set_cell(ws, "B4", translated_text)
+    set_cell(ws, "D4", "Serial / ID / Серійний номер / ID")
+
+    keyboard = [
+        [InlineKeyboardButton("Shyroke", callback_data="Shyroke")],
+        [InlineKeyboardButton("Mykolaiv", callback_data="Mykolaiv")],
+        [InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]
+    ]
+    await update.message.reply_text(
+        "Select vehicle location | Оберіть локацію автомобіля:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
     return ALLOCATION
 
 # =================== Ввод данных ===================
@@ -216,7 +299,7 @@ async def serial_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # проверка формата: две буквы - дефис - две цифры
     if not re.fullmatch(r"[A-Z]{2}-\d{2}", text):
         await update.message.reply_text(
-            "❌ Неверный формат номера авто. Формат должен быть: AA-12\nTry again / Спробуйте ще раз:"
+            "❌ Невірный формат номера авто. Формат повинен бути:(напр. HP-12)\nTry again / Спробуйте ще раз:"
         )
         return SERIAL
     
@@ -363,14 +446,23 @@ async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TY
     filename = f"LDR_{plate}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.xlsx"
 
     # Отправка менеджерам по локации
+
+
+    # Отправка менеджерам по локации
     location = context.user_data.get("location")
     manager_ids = MANAGERS.get(location, [])
+    user_id = update.effective_user.id
+    user_name = ALLOWED_USERS.get(user_id, "Unknown")  # получаем имя из словаря
+
     for manager_id in manager_ids:
         file_stream = BytesIO()
         ws.parent.save(file_stream)
         file_stream.seek(0)
         await context.bot.send_document(chat_id=manager_id, document=file_stream, filename=filename)
-        await context.bot.send_message(chat_id=manager_id, text=f"📄 Новий LDR звіт по локації {location}")
+        await context.bot.send_message(
+            chat_id=manager_id,
+            text=f"📄 Новий LDR звіт по локації {location} від {user_name}"
+        )
 
     context.user_data.clear()
 
@@ -385,8 +477,6 @@ async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TY
     await update.message.reply_photo(photo=logo_file, caption="Welcome to NPA Fleet bot 🚗", reply_markup=reply_markup)
 
     return ConversationHandler.END
-
-
 
 # Функция для авто-подгонки высоты строки A9 с минимальной защитой
 def auto_height_for_cell(ws, cell_address, min_height=30):
@@ -413,21 +503,27 @@ async def generic_stub(update: Update, context: ContextTypes.DEFAULT_TYPE, name=
     await query.message.reply_text(f"You selected {name}. Function in progress.", reply_markup=InlineKeyboardMarkup(keyboard))
 
 
-async def var_callback(update: Update, context: ContextTypes.DEFAULT_TYPE): return await generic_stub(update, context, "VAR / ВАР")
-#async def contacts_callback(update: Update, context: ContextTypes.DEFAULT_TYPE): return await generic_stub(update, context, "Contacts / Контакти")
-async def other_questions_callback(update: Update, context: ContextTypes.DEFAULT_TYPE): return await generic_stub(update, context, "Other questions / Інші питання")
+#=====================================================LDR END=============================================================================
 
 
 
-#=====================================================MFR==================================================
 
 
 
+
+
+
+
+
+
+
+
+#=====================================================MFR=================================================================================
 
 ALLOCATION, MODEL_SELECTION, SERIAL, TEAM_NUMBER, USER, DESCRIPTION = range(6)
 
-
 # Начало MFR запроса — спрашиваем локацию
+@restricted
 async def mfr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -486,7 +582,7 @@ async def mfr_location_selection(update: Update, context: ContextTypes.DEFAULT_T
         [InlineKeyboardButton("Toyota Land Cruiser", callback_data="Toyota Land Cruiser")],
         [InlineKeyboardButton("Ford Transit", callback_data="Ford Transit")],
         [InlineKeyboardButton("Ford Ranger", callback_data="Ford Ranger")],
-        [InlineKeyboardButton("Mitsubishi L200", callback_data="Mitsubishi L200")],
+        [InlineKeyboardButton("Mitsubishi", callback_data="Mitsubishi L200")],
         [InlineKeyboardButton("Volkswagen", callback_data="Volkswagen")],
         [InlineKeyboardButton("Renault Duster", callback_data="Renault Duster")],
         [InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]
@@ -536,7 +632,7 @@ async def serial_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not re.fullmatch(r"[A-Z]{2}-\d{2}", text):
         await update.message.reply_text(
-            "❌ Неверный формат номера авто. Формат должен быть: AA-12\nTry again | Спробуйте ще раз:"
+            "❌ Невірный формат номера авто. Формат повинен бути:(напр. HP-12)\nTry again | Спробуйте ще раз:"
         )
         return SERIAL
 
@@ -655,14 +751,24 @@ async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TY
     filename = f"MFR_{plate}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.xlsx"
 
     # --- Отправка менеджеру ---
+
+    # Отправка менеджерам по локации
     location = context.user_data.get("location")
     manager_ids = MANAGERS.get(location, [])
+    user_id = update.effective_user.id
+    user_name = ALLOWED_USERS.get(user_id, "Unknown")  # получаем имя из словаря
+
     for manager_id in manager_ids:
         file_stream = BytesIO()
         ws.parent.save(file_stream)
         file_stream.seek(0)
         await context.bot.send_document(chat_id=manager_id, document=file_stream, filename=filename)
-        await context.bot.send_message(chat_id=manager_id, text=f"📄 Новий MFR звіт по локації {location}")
+        await context.bot.send_message(
+            chat_id=manager_id,
+            text=f"📄 Новий MFR звіт по локації {location} від {user_name}"
+    )
+
+ 
 
     context.user_data.clear()
     await update.message.reply_text("✅ Your report has been sent! / ✅ Звіт надіслано!")
@@ -681,15 +787,13 @@ async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TY
 #=============================================================MFR END=============================================================
 
 
-#==============================================================VAR============================================================
-#==============================================================VAR END=========================================================
 
 
 
 
 #===================================================================CONTACTS====================================================
 
-
+@restricted
 async def contacts_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -726,6 +830,7 @@ async def contacts_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 #Обработчик конкретной локации
+@restricted
 async def contact_location_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -771,22 +876,39 @@ async def contact_location_callback(update: Update, context: ContextTypes.DEFAUL
 #Контакты по локациям
 LOCATIONS = {
     "shyroke": {
-        "manager": "F.A. Oleksandr Rudnov | F.A. Олександр Руднов",
-        "phone": "+380 431 019 082",
-        "map": "https://goo.gl/maps/example1",
+        "manager": {
+            "name": "Oleksandr Rudnov | Олександр Руднов",
+            "phone": "+380987938674",
+            "email": "OleRud441@npaid.org"
+        },
+        "senior_officer": {
+            "position": "Senior Fleet Officer",
+            "name": "Roman Kucherevskyi",
+            "phone": "+380661930132",
+            "email": "RomKuc884@npaid.org"
+        },
         "car_washes": [
-            {"name": "Car Wash 1", "phone": "+380 431 000 001", "map": "https://goo.gl/maps/carwash1_shyroke"},
-            {"name": "Car Wash 2", "phone": "+380 431 000 002", "map": "https://goo.gl/maps/carwash2_shyroke"},
+            {"name": "Avtoynhulstroy", "phone": "+380 67 633 1025", "map": "https://www.google.com/maps?cid=3778105884522161440"},
+            {"name": "Nova Liniya", "phone": "+380 97 577 2770", "map": "https://www.google.com/maps?cid=1167848751790635382"},
         ],
         "tire_services": [
-            {"name": "Tire Service 1", "phone": "+380 431 111 001", "map": "https://goo.gl/maps/tire1_shyroke"},
-            {"name": "Tire Service 2", "phone": "+380 431 111 002", "map": "https://goo.gl/maps/tire2_shyroke"},
+            {"name": "Avtoynhulstroy", "phone": "+380 67 633 1025", "map": "https://www.google.com/maps?cid=3778105884522161440"},
+            {"name": "Nova Liniya", "phone": "+380 97 577 2770", "map": "https://www.google.com/maps?cid=1167848751790635382"},
+            {"name": "SHYROKE - Tyre service", "phone": "+380 98 455 8113", "map": "https://maps.app.goo.gl/otgcPE4GaHowdxEj8"},
         ],
     },
     "mykolaiv": {
-        "manager": "F.A. Andriy Padalka | F.A. Андрій Падалка",
-        "phone": "+380 431 019 083",
-        "map": "https://goo.gl/maps/example2",
+        "manager": {
+            "name": "Andriy Padalka | Андрій Падалка",
+            "phone": "+380506008345",
+            "email": "AndPad212@npaid.org"
+        },
+        "senior_officer": {
+            "position": "Senior Fleet Officer",
+            "name": "Roman Kucherevskyi",
+            "phone": "+380661930132",
+            "email": "RomKuc884@npaid.org"
+        },
         "car_washes": [
             {"name": "Car Wash 1", "phone": "+380 432 000 001", "map": "https://goo.gl/maps/carwash1_mykolaiv"},
             {"name": "Car Wash 2", "phone": "+380 432 000 002", "map": "https://goo.gl/maps/carwash2_mykolaiv"},
@@ -799,6 +921,8 @@ LOCATIONS = {
 }
 
 
+
+@restricted
 async def contact_location_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -815,13 +939,23 @@ async def contact_location_callback(update: Update, context: ContextTypes.DEFAUL
 
     if data.startswith("contact_"):
         loc_key = data.split("_")[1]  # shyroke или mykolaiv
-        text = f"📌 {loc_key.capitalize()} | {loc_key.capitalize()}\n" \
-               f"👤 {LOCATIONS[loc_key]['manager']}\n" \
-               f"📞 Phone: {LOCATIONS[loc_key]['phone']}\n" \
-               f"🌐 Map: {LOCATIONS[loc_key]['map']}"
+        loc_data = LOCATIONS[loc_key]
+        manager = loc_data["manager"]
+        senior = loc_data["senior_officer"]
+
+        text = (
+            f"📌 {loc_key.capitalize()}\n\n"
+            f"👤 Fleet Assistant: {manager['name']}\n"
+            f"📞 Phone: {manager['phone']}\n"
+            f"✉️ Email: {manager['email']}\n\n"
+            f"👔 {senior['position']}: {senior['name']}\n"
+            f"📞 Phone: {senior['phone']}\n"
+            f"✉️ Email: {senior['email']}\n\n"  
+        )
+
         keyboard = [
-            [InlineKeyboardButton("Car Wash | Мийка", callback_data=f"{loc_key}_carwash")],
-            [InlineKeyboardButton("Tire Service | Шиномонтаж", callback_data=f"{loc_key}_tire")],
+            [InlineKeyboardButton("🧼 Car Wash | Мийка", callback_data=f"{loc_key}_carwash")],
+            [InlineKeyboardButton("🔧 Tire Service | Шиномонтаж", callback_data=f"{loc_key}_tire")],
             [InlineKeyboardButton("❌ Back | Назад", callback_data="contacts")]
         ]
     elif data.endswith("_carwash"):
@@ -846,9 +980,14 @@ async def contact_location_callback(update: Update, context: ContextTypes.DEFAUL
 
 
 
+
 #===================================================================CONTACTS END====================================================
 
+#====================================================================OTHER QUESTIONS==================================================
 
+
+
+#====================================================================END==============================================================
 
 
 
@@ -861,17 +1000,21 @@ def main():
 
 
     ldr_conv = ConversationHandler(
-        entry_points=[CallbackQueryHandler(ldr_request_type_callback, pattern="^(flat_tire|wipers|Drivers_card|other_request)$")],
-        states={
-            SERIAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, serial_input_ldr)],
-            ALLOCATION: [CallbackQueryHandler(allocation_input_ldr)],
-            TEAM_NUMBER: [MessageHandler(filters.TEXT & ~filters.COMMAND, team_number_input_ldr)],
-            USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, user_input_ldr)],
-            DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, description_input_ldr)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel), CallbackQueryHandler(cancel, pattern="cancel")],
-        per_user=True
-    )
+    entry_points=[CallbackQueryHandler(ldr_request_type_callback, pattern="^(flat_tire|wipers|Drivers_card|other_request)$")],
+    states={
+        SERIAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, serial_input_ldr)],
+        ALLOCATION: [CallbackQueryHandler(allocation_input_ldr)],
+        TEAM_NUMBER: [MessageHandler(filters.TEXT & ~filters.COMMAND, team_number_input_ldr)],
+        USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, user_input_ldr)],
+        DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, description_input_ldr)],
+        OTHER_REQUEST_INPUT: [MessageHandler(filters.TEXT & ~filters.COMMAND, ldr_other_request_input)],  # новый шаг
+    },
+    fallbacks=[CommandHandler("cancel", cancel), CallbackQueryHandler(cancel, pattern="cancel")],
+    per_user=True
+)
+
+
+
 # MFR Conversation
 
 
@@ -899,25 +1042,27 @@ def main():
 
 
 
+    
+
+
+
 
     
     # Handlers
     app.add_handler(mfr_conv)
-
+    # app.add_handler(other_questions_conv)
     app.add_handler(ldr_conv)
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(start_button_callback, pattern="main_menu"))
     app.add_handler(CallbackQueryHandler(ldr_callback, pattern="ldr"))
     app.add_handler(CallbackQueryHandler(mfr_callback, pattern="mfr"))
-    app.add_handler(CallbackQueryHandler(var_callback, pattern="var"))
     app.add_handler(CallbackQueryHandler(contacts_callback, pattern="contacts"))
-    app.add_handler(CallbackQueryHandler(other_questions_callback, pattern="other_questions"))
+    
+
+
+
+
     app.add_handler(CallbackQueryHandler(cancel, pattern="cancel"))
-    # app.add_handler(CallbackQueryHandler(contacts_callback, pattern="^contacts$"))
-    # app.add_handler(CallbackQueryHandler(contact_location_callback, pattern="^contact_shyroke$|^contact_mykolaiv$|^back$"))
-
-
-
     app.add_handler(CallbackQueryHandler(contacts_callback, pattern="^contacts$"))
     app.add_handler(CallbackQueryHandler(contact_location_callback, pattern="^contact_shyroke$|^contact_mykolaiv$|^shyroke_carwash$|^shyroke_tire$|^mykolaiv_carwash$|^mykolaiv_tire$|^back$"))
 

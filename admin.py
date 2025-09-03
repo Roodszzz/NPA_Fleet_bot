@@ -172,6 +172,14 @@ MANAGERS = {
 
 
 # =================== LDR ===================
+SERIAL = 1
+ALLOCATION = 2
+TEAM_NUMBER = 3
+USER = 4
+DESCRIPTION = 5
+OTHER_REQUEST_INPUT = 6
+
+
 
 
 
@@ -183,36 +191,43 @@ async def ldr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("Flat tire | Пошкоджене колесо", callback_data="flat_tire")],
         [InlineKeyboardButton("Wipers replacement | Заміна дворників", callback_data="wipers")],
         [InlineKeyboardButton("Driver's card | Водійська карта", callback_data="Drivers_card")],
-        #[InlineKeyboardButton("Other request | Інше звернення", callback_data="other_request")],
+        [InlineKeyboardButton("Other request | Інше звернення", callback_data="other_request")],
         [InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]
     ]
     try: await query.message.delete()
     except: pass
     await query.message.reply_text("Choose request type | Виберіть тип звернення:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
 @restricted
 async def ldr_request_type_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
+
     if data == "cancel":
         return await cancel(update, context)
-    if data == "other_request":
-        await query.message.reply_text("You chose: Other request | Ви обрали: Інше звернення.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]]))
-        return ConversationHandler.END
-    
 
     context.user_data['wb'] = get_workbook("LDR")
     context.user_data['ws'] = context.user_data['wb'].active
-
-    # context.user_data['wb'] = get_workbook()
-    # context.user_data['ws'] = context.user_data['wb'].active
     ws = context.user_data['ws']
+
+    if data == "other_request":
+        try: await query.message.delete()
+        except: pass
+        await query.message.reply_text(
+            "Please type your request | Введіть ваше звернення:"
+        )
+        return OTHER_REQUEST_INPUT  # <-- возвращаем константу, а не строку
+
+    # Старые варианты кнопок с готовыми фразами
     if data == "flat_tire":
         set_cell(ws, "B4", "Flat tyre | Пошкоджене колесо")
     elif data == "wipers":
         set_cell(ws, "B4", "Wipers replacement | Заміна дворників")
     elif data == "Drivers_card":
         set_cell(ws, "B4", "Driver's card | Водійська карта")    
+
     set_cell(ws, "D4", "Serial / ID / Серійний номер / ID")
 
     keyboard = [
@@ -222,8 +237,34 @@ async def ldr_request_type_callback(update: Update, context: ContextTypes.DEFAUL
     ]
     try: await query.message.delete()
     except: pass
-    await query.message.reply_text("Select vehicle location | Оберіть локацію автомобіля:", reply_markup=InlineKeyboardMarkup(keyboard))
+    await query.message.reply_text(
+        "Select vehicle location | Оберіть локацію автомобіля:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
     return ALLOCATION
+
+
+
+# Новый хэндлер для ввода текста пользователем
+@restricted
+async def ldr_other_request_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_text = update.message.text
+    ws = context.user_data['ws']
+    set_cell(ws, "B4", user_text)  # записываем текст пользователя в B4
+    set_cell(ws, "D4", "Serial / ID / Серійний номер / ID")
+
+    keyboard = [
+        [InlineKeyboardButton("Shyroke", callback_data="Shyroke")],
+        [InlineKeyboardButton("Mykolaiv", callback_data="Mykolaiv")],
+        [InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]
+    ]
+    await update.message.reply_text(
+        "Select vehicle location | Оберіть локацію автомобіля:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    return ALLOCATION
+
+
 
 # =================== Ввод данных ===================
 async def serial_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1045,17 +1086,21 @@ def main():
 
 
     ldr_conv = ConversationHandler(
-        entry_points=[CallbackQueryHandler(ldr_request_type_callback, pattern="^(flat_tire|wipers|Drivers_card|other_request)$")],
-        states={
-            SERIAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, serial_input_ldr)],
-            ALLOCATION: [CallbackQueryHandler(allocation_input_ldr)],
-            TEAM_NUMBER: [MessageHandler(filters.TEXT & ~filters.COMMAND, team_number_input_ldr)],
-            USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, user_input_ldr)],
-            DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, description_input_ldr)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel), CallbackQueryHandler(cancel, pattern="cancel")],
-        per_user=True
-    )
+    entry_points=[CallbackQueryHandler(ldr_request_type_callback, pattern="^(flat_tire|wipers|Drivers_card|other_request)$")],
+    states={
+        SERIAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, serial_input_ldr)],
+        ALLOCATION: [CallbackQueryHandler(allocation_input_ldr)],
+        TEAM_NUMBER: [MessageHandler(filters.TEXT & ~filters.COMMAND, team_number_input_ldr)],
+        USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, user_input_ldr)],
+        DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, description_input_ldr)],
+        OTHER_REQUEST_INPUT: [MessageHandler(filters.TEXT & ~filters.COMMAND, ldr_other_request_input)],  # новый шаг
+    },
+    fallbacks=[CommandHandler("cancel", cancel), CallbackQueryHandler(cancel, pattern="cancel")],
+    per_user=True
+)
+
+
+
 # MFR Conversation
 
 
