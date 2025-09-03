@@ -103,6 +103,8 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ALLOWED_USERS = {
     507775858: "Oleksandr Rudnov",
     6093640376: "Roman Kucherevskyi",
+    787549014: "Anastasia Vesloguzova",
+    513781701: "Dmytro Safonenko",
 }
 
 
@@ -227,11 +229,11 @@ async def ldr_request_type_callback(update: Update, context: ContextTypes.DEFAUL
 
     # Старые варианты кнопок с готовыми фразами
     if data == "flat_tire":
-        set_cell(ws, "B4", "Flat tyre | Пошкоджене колесо")
+        set_cell(ws, "B4", "Flat tyre")
     elif data == "wipers":
-        set_cell(ws, "B4", "Wipers replacement | Заміна дворників")
+        set_cell(ws, "B4", "Wipers replacement")
     elif data == "Drivers_card":
-        set_cell(ws, "B4", "Driver's card | Водійська карта")    
+        set_cell(ws, "B4", "Driver's card")    
 
     set_cell(ws, "D4", "Serial / ID / Серійний номер / ID")
 
@@ -439,7 +441,7 @@ async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TY
     # Логотип
     logo_path = os.path.join(os.path.dirname(__file__), "logo", "Лого ексель.png")
     img = Image(logo_path)
-    img.width, img.height = 396, 72
+    img.width, img.height = 1069, 194
     ws.add_image(img, "A1")
 
     plate = ws["D4"].value or "CAR"
@@ -479,7 +481,7 @@ async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TY
     return ConversationHandler.END
 
 # Функция для авто-подгонки высоты строки A9 с минимальной защитой
-def auto_height_for_cell(ws, cell_address, min_height=30):
+def auto_height_for_cell(ws, cell_address, min_height=45):
     """Автоматическая высота строки под содержимое, но не меньше min_height"""
     cell = ws[cell_address]
     row = cell.row
