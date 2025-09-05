@@ -56,7 +56,23 @@ async def translate_to_en(text: str) -> str:
     result = await translator.translate(text, dest='en')
     return result.text
 
+# def set_cell(ws, cell, value):
+#     ws[cell] = value
+#     ws[cell].alignment = Alignment(horizontal="center", vertical="center")
 
+# def auto_adjust(ws, cells):
+#     for cell in cells:
+#         value = ws[cell].value
+#         if value:
+#             col_letter = ''.join(filter(str.isalpha, cell))
+#             ws.column_dimensions[col_letter].width = max(
+#                 ws.column_dimensions[col_letter].width or 10,
+#                 len(str(value)) + 2
+#             )
+#             ws.row_dimensions[ws[cell].row].height = max(
+#                 ws.row_dimensions[ws[cell].row].height or 15,
+#                 15
+#             )
 
 
 def set_cell(ws, cell, value):
@@ -176,7 +192,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # очищаем user_data
     context.user_data.clear()
 
-    # # готовим фото
+    # готовим фото
     logo_bytes = get_logo_bytes()
     logo_file = InputFile(logo_bytes, filename="logo.png")
     keyboard = [[InlineKeyboardButton("Start | Почати", callback_data="main_menu")]]
@@ -452,7 +468,7 @@ async def allocation_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # Если MECH — просто записываем в Excel и спрашиваем имя
     if selection.upper() == "MECH":
-        set_cell(ws, "F10", "MECH")
+        set_cell(ws, "D6", "MECH")
         try: await query.message.delete()
         except: pass
         await query.message.reply_text(
@@ -505,7 +521,7 @@ async def user_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def auto_height_for_cell(ws, cell_address):
     cell = ws[cell_address]
-    cell.alignment = Alignment(horizontal="left", vertical="bottom", wrap_text=True)
+    cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
 
     # Получаем ширину колонки в символах (приближённо)
     col_letter = ''.join(filter(str.isalpha, cell_address))
@@ -536,6 +552,20 @@ async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 
+
+
+
+    # # Вставка текста в A9 с переносом и выравниванием по левому краю
+    # cell = ws["A9"]
+    # cell.value = text_en
+    # from openpyxl.styles import Alignment
+    # cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+
+    # # Авто-высота строки для A9 с минимальной высотой
+    # auto_height_for_cell(ws, "A9", min_height=200)
+
+
+
 def split_text(text, words_per_line=12):
     """Разбивает текст на строки примерно по 20 слов"""
     words = text.split()
@@ -551,7 +581,7 @@ async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TY
     ws = context.user_data['ws']
 
     # Разбиваем текст на куски
-    lines = split_text(text_en, words_per_line=20)
+    lines = split_text(text_en, words_per_line=25)
 
     # вставка текста по строкам
     start_row = 16  # теперь B16
@@ -560,7 +590,7 @@ async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TY
             break
         cell = ws[f"B{i}"]
         cell.value = line
-        cell.alignment = Alignment(horizontal="left", vertical="bottom")
+        cell.alignment = Alignment(horizontal="left", vertical="top")
 
 
     # Подгоняем размеры остальных ячеек
@@ -948,11 +978,11 @@ async def user_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name_latin = unidecode(text)
     ws = context.user_data['ws']
     set_cell(ws, "I6", user_name_latin)
-    set_cell(ws, "B22", user_name_latin)
+    set_cell(ws, "B23", user_name_latin)
     location = context.user_data.get('location')
     manager_fa = {"Shyroke":"F.A. Oleksandr Rudnov","Mykolaiv":"F.A. Andriy Padalka"}.get(location,"F.A. Unknown")
-    set_cell(ws, "F22", manager_fa)
-    set_cell(ws, "C22", datetime.now().strftime("%Y-%m-%d"))
+    set_cell(ws, "F23", manager_fa)
+    set_cell(ws, "C23", datetime.now().strftime("%Y-%m-%d"))
     set_cell(ws, "F12", datetime.now().strftime("%Y-%m-%d"))
     await update.message.reply_text(
         "Briefly describe the situation | Коротко опишіть ситуацію:",
@@ -966,27 +996,6 @@ async def user_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-# async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     text = update.message.text.strip()
-#     if not text:
-#         await update.message.reply_text("❌ Describe the situation / ❌ Опишіть ситуацію")
-#         return DESCRIPTION
-
-#     text_en = await translate_to_en(text)
-#     ws = context.user_data['ws']
-
-#     # --- Записываем текст в одну ячейку и выравниваем ---
-#     ws["B16"] = text_en
-#     ws["B16"].alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
-
-
-
-
-def split_text(text, words_per_line=20):
-    """Разбивает текст на строки примерно по N слов"""
-    words = text.split()
-    return [" ".join(words[i:i+words_per_line]) for i in range(0, len(words), words_per_line)]
-
 async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if not text:
@@ -996,32 +1005,23 @@ async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TY
     text_en = await translate_to_en(text)
     ws = context.user_data['ws']
 
-    # Разбиваем текст на куски (по 20 слов)
-    lines = split_text(text_en, words_per_line=20)
+    # --- Записываем текст в одну ячейку и выравниваем ---
+    ws["B16"] = text_en
+    ws["B16"].alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
 
-    # вставка текста по строкам
-    start_row = 16  # начинаем с B16
-    for i, line in enumerate(lines, start=start_row):
-        if i > 21:  # ограничение по строкам
-            break
-        cell = ws[f"B{i}"]
-        cell.value = line
-        cell.alignment = Alignment(horizontal="left", vertical="bottom")
-
-
-    # # --- Автоподгонка высоты ячейки под текст ---
-    # auto_height_for_cell(ws, "B16", min_height=50)
+    # --- Автоподгонка высоты ячейки под текст ---
+    auto_height_for_cell(ws, "B16", min_height=50)
 
     # --- Подгонка остальных ячеек ---
-    auto_adjust(ws, ["F5", "C6", "C9", "F9", "I6", "F22", "C22"])
+    auto_adjust(ws, ["F6", "C6", "C9", "F9", "I6", "F23", "C23"])
 
-    # # --- Лого ---
-    # logo_path = os.path.join(os.path.dirname(__file__), "logo", "Лого ексель.png")
-    # img = Image(logo_path)
-    # img.width, img.height = 396, 72
-    # ws.add_image(img, "B2")
+    # --- Лого ---
+    logo_path = os.path.join(os.path.dirname(__file__), "logo", "Лого ексель.png")
+    img = Image(logo_path)
+    img.width, img.height = 396, 72
+    ws.add_image(img, "B2")
 
-    plate = ws["F5"].value or "CAR"
+    plate = ws["F6"].value or "CAR"
     filename = f"MFR_{plate}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.xlsx"
 
     # --- Отправка менеджеру ---
@@ -1274,7 +1274,53 @@ async def contact_location_callback(update: Update, context: ContextTypes.DEFAUL
 def main():
     app = Application.builder().token(TOKEN).build()
 
+# LDR Conversation
 
+
+#     ldr_conv = ConversationHandler(
+#     entry_points=[CallbackQueryHandler(ldr_request_type_callback, pattern="^(flat_tire|wipers|Drivers_card|other_request)$")],
+#     states={
+#         SERIAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, serial_input_ldr)],
+#         ALLOCATION: [CallbackQueryHandler(allocation_input_ldr)],
+#         TEAM_NUMBER: [MessageHandler(filters.TEXT & ~filters.COMMAND, team_number_input_ldr)],
+#         USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, user_input_ldr)],
+#         DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, description_input_ldr)],
+#         OTHER_REQUEST_INPUT: [MessageHandler(filters.TEXT & ~filters.COMMAND, ldr_other_request_input)],  # новый шаг
+#     },
+#     fallbacks=[CommandHandler("cancel", cancel), CallbackQueryHandler(cancel, pattern="cancel")],
+#     per_user=True
+# )
+
+
+
+# # MFR Conversation
+    
+#     mfr_conv = ConversationHandler(
+#     entry_points=[CallbackQueryHandler(mfr_callback, pattern="mfr")],
+#     states={
+#         # ------------------- Локации -------------------
+#         ALLOCATION: [
+#             CallbackQueryHandler(mfr_location_selection, pattern="^(Shyroke|Mykolaiv)$"),
+#             CallbackQueryHandler(allocation_input_mfr)  # все остальные аллокации
+#         ],
+
+#         # ------------------- Бренды и модели -------------------
+#         MODEL_SELECTION: [
+#             CallbackQueryHandler(model_input_mfr, pattern="^(brand_.*|back_to_brands|.*)$")
+#         ],
+
+#         # ------------------- Ввод данных -------------------
+#         SERIAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, serial_input_mfr)],
+#         TEAM_NUMBER: [MessageHandler(filters.TEXT & ~filters.COMMAND, team_number_input_mfr)],
+#         USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, user_input_mfr)],
+#         DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, description_input_mfr)],
+#     },
+#     fallbacks=[
+#         CommandHandler("cancel", cancel),
+#         CallbackQueryHandler(cancel, pattern="cancel")
+#     ],
+#     per_user=True
+# )
     # LDR Conversation
     ldr_conv = ConversationHandler(
         entry_points=[
