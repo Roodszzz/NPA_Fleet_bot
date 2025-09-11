@@ -131,15 +131,21 @@ ALLOWED_USERS = {
 
     #BIGBOSS
     6093640376: "Roman Kucherevskyi",
-    
+
     #SHY
+    #MTT
     787549014: "Anastasia Vesloguzova",
     513781701: "Dmytro Safonenko",
+    576130995: "Andrii Diomin",
+
+    #TFM
+    5867471783: "Gary Mc Bride",
+
+    #NTS
     528557238: "Vladyslav Prikhodko",
     702797267: "Maksym Shevchenko",
     1337501641: "Vladyslav Kotliarov",
-    5867471783: "Gary Mc Bride",
-    576130995: "Andrii Diomin",
+    
 
     #FIELD ASSISTANT
     1917157862: "Polina Hryshko",
