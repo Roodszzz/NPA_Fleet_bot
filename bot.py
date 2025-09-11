@@ -20,7 +20,7 @@ import math
 
 
 
-# =================== Загрузка переменных ===================
+    # =================== Загрузка переменных ===================
 load_dotenv()
 TOKEN = os.getenv("TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
@@ -115,7 +115,7 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # если нужно ограничить доступ — ставишь True
-RESTRICTED_MODE = False
+RESTRICTED_MODE = True
 
 
 
@@ -125,12 +125,20 @@ RESTRICTED_MODE = False
 # =================== Старт ===================
 
 ALLOWED_USERS = {
-    5077758580: "Oleksandr Rudnov",
+    507775858: "Oleksandr Rudnov",
+    6488832046: "Andriy Padalka",
     6093640376: "Roman Kucherevskyi",
     787549014: "Anastasia Vesloguzova",
     513781701: "Dmytro Safonenko",
     528557238: "Vladyslav Prikhodko",
     702797267: "Maksym Shevchenko",
+    1337501641: "Vladyslav Kotliarov",
+    5867471783: "Gary Mc Bride",
+    1917157862: "Polina Hryshko",
+    355265317: "Vadym Dubrivnyi",
+    1786562045: "Viacheslav Len",
+    576130995: "Andrii Diomin",
+
 }
 
 
@@ -147,7 +155,7 @@ def restricted(func):
         return await func(update, context, *args, **kwargs)
     return wrapper
 
-#@restricted
+@restricted
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
@@ -189,12 +197,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.callback_query.answer()
         await update.callback_query.message.reply_photo(photo=logo_file, caption="Welcome to NPA Fleet bot 🚗", reply_markup=reply_markup)
 
-#@restricted
+@restricted
 async def start_button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await main_menu(update, context)
 
 # =================== Cancel ===================
-#@restricted
+@restricted
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     if update.callback_query:
@@ -207,7 +215,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 MANAGERS = {
     "Shyroke": [ADMIN_ID],
-    "Mykolaiv": [6093640376],
+    "Mykolaiv": [6093640376, 6488832046],
 }
 
 
@@ -230,7 +238,7 @@ USER = 4
 DESCRIPTION = 5
 OTHER_REQUEST_INPUT = 6
 
-#@restricted
+@restricted
 async def ldr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -243,11 +251,11 @@ async def ldr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     try: await query.message.delete()
     except: pass
-    await query.message.reply_text("Choose request type | Виберіть тип звернення:", reply_markup=InlineKeyboardMarkup(keyboard))
+    await query.message.reply_text("Choose request type:\nВиберіть тип звернення:", reply_markup=InlineKeyboardMarkup(keyboard))
 
 
-#@restricted
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+@restricted
+
 
 async def ldr_request_type_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -269,11 +277,11 @@ async def ldr_request_type_callback(update: Update, context: ContextTypes.DEFAUL
 
         # создаём кнопку Cancel
         cancel_button = InlineKeyboardMarkup([
-            [InlineKeyboardButton("Cancel ❌", callback_data="cancel")]
+            [InlineKeyboardButton("❌ Cancel", callback_data="cancel")]
         ])
 
         await query.message.reply_text(
-            "Please indicate what is damaged: \nВкажіть, що пошкоджено:",
+            "Please indicate what is damaged:\nВкажіть, що пошкоджено:",
             reply_markup=cancel_button
         )
         
@@ -298,7 +306,7 @@ async def ldr_request_type_callback(update: Update, context: ContextTypes.DEFAUL
     try: await query.message.delete()
     except: pass
     await query.message.reply_text(
-        "Select vehicle location | Оберіть локацію автомобіля:",
+        "Select vehicle location:\nОберіть локацію автомобіля:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     return ALLOCATION
@@ -315,7 +323,7 @@ async def translate_to_en(text: str) -> str:
     translated = await translator.translate(text, dest='en')
     return translated.text
 
-#@restricted
+@restricted
 async def ldr_other_request_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text.strip()
     if not user_text:
@@ -337,7 +345,7 @@ async def ldr_other_request_input(update: Update, context: ContextTypes.DEFAULT_
         [InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]
     ]
     await update.message.reply_text(
-        "Select vehicle location | Оберіть локацію автомобіля:",
+        "Select vehicle location:\nОберіть локацію автомобіля:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     return ALLOCATION
@@ -365,7 +373,7 @@ async def serial_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # проверка формата: две буквы - дефис - две цифры
     if not re.fullmatch(r"[A-Z]{2}-\d{2}", text):
         await update.message.reply_text(
-            "❌ Невірный формат номера авто. Формат повинен бути:(напр. HP-12)\nTry again / Спробуйте ще раз:"
+            "❌ Формат повинен бути:(напр. HP-12)\n        Format must be:(e.g. HP-12)"
         )
         return SERIAL
 
@@ -379,7 +387,7 @@ async def serial_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard.append([InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")])
 
     await update.message.reply_text(
-        "Choose Allocation | Оберіть Розподіл:",
+        "Choose Allocation:\nОберіть Розподіл:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     return ALLOCATION
@@ -422,7 +430,7 @@ async def allocation_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYP
         try: await query.message.delete()
         except: pass
         await query.message.reply_text(
-            "Choose sub-allocation for OPS/SUPP | Оберіть підрозподіл для OPS/SUPP:",
+            "Choose sub-allocation for OPS/SUPP:\nОберіть підрозподіл для OPS/SUPP:",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return ALLOCATION  # остаёмся на этом же шаге, ждём второй выбор
@@ -434,7 +442,7 @@ async def allocation_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYP
         try: await query.message.delete()
         except: pass
         await query.message.reply_text(
-            "Enter your full name | Введіть ваше Ім'я та прізвище:",
+            "Enter your full name:\nВведіть ваше Ім'я та прізвище:",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]])
         )
         return USER
@@ -445,7 +453,7 @@ async def allocation_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYP
         try: await query.message.delete()
         except: pass
         await query.message.reply_text(
-            f"Enter team number for {selection.upper()} | Введіть номер команди для {selection.upper()}:",
+            f"Enter team number for {selection.upper()}:\nВведіть номер команди для {selection.upper()}:",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]])
         )
         return TEAM_NUMBER
@@ -456,7 +464,7 @@ async def allocation_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYP
         try: await query.message.delete()
         except: pass
         await query.message.reply_text(
-            "Enter your full name | Введіть ваше Ім'я та прізвище:",
+            "Enter your full name:\nВведіть ваше Ім'я та прізвище:",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]])
         )
         return USER
@@ -471,7 +479,7 @@ async def team_number_input_ldr(update: Update, context: ContextTypes.DEFAULT_TY
     allocation = context.user_data.get('allocation')
     set_cell(ws, "F10", f"{allocation}-{text}")
     await update.message.reply_text(
-        "Enter your full name | Введіть Ім'я та прізвище:",
+        "Enter your full name:\nВведіть Ім'я та прізвище:",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]])
     )
     return USER
@@ -491,8 +499,8 @@ async def user_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     set_cell(ws, "F21", manager_fa)
     set_cell(ws, "C21", datetime.now().strftime("%Y-%m-%d"))
     await update.message.reply_text(
-        "Briefly describe the situation | Коротко опишіть ситуацію:",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]])
+        "Briefly describe the situation:\nКоротко опишіть ситуацію:",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
     )
     return DESCRIPTION
 
@@ -525,7 +533,7 @@ def auto_height_for_cell(ws, cell_address):
 async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if not text:
-        await update.message.reply_text("❌ Describe the situation / ❌ Опишіть ситуацію")
+        await update.message.reply_text("❌ Describe the situation:\n❌ Опишіть ситуацію")
         return DESCRIPTION
 
     text_en = await translate_to_en(text)
@@ -544,7 +552,7 @@ def split_text(text, words_per_line=12):
 async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if not text:
-        await update.message.reply_text("❌ Describe the situation / ❌ Опишіть ситуацію")
+        await update.message.reply_text("❌ Describe the situation:\n❌ Опишіть ситуацію")
         return DESCRIPTION
 
     text_en = await translate_to_en(text)
@@ -600,7 +608,7 @@ async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TY
     context.user_data.clear()
 
     # Уведомление пользователю
-    await update.message.reply_text("✅ Your report has been sent! / ✅ Звіт надіслано!")
+    await update.message.reply_text("✅ Your report has been sent!:\n✅ Звіт надіслано!")
 
     # Приветственное фото с кнопкой
     logo_bytes_start = get_logo_bytes()
@@ -656,7 +664,7 @@ async def generic_stub(update: Update, context: ContextTypes.DEFAULT_TYPE, name=
 ALLOCATION, MODEL_SELECTION, SERIAL, TEAM_NUMBER, USER, DESCRIPTION = range(6)
 
 # Начало MFR запроса — спрашиваем локацию
-#@restricted
+@restricted
 async def mfr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -683,7 +691,7 @@ async def mfr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
 
     await query.message.reply_text(
-        "Select vehicle location | Оберіть локацію автомобіля:",
+        "Select vehicle location:\nОберіть локацію автомобіля:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     return ALLOCATION
@@ -722,7 +730,7 @@ async def mfr_location_selection(update: Update, context: ContextTypes.DEFAULT_T
     ]
 
     await query.message.reply_text(
-        "Select car brand | Оберіть марку авто:",
+        "Select car brand:\nОберіть марку авто:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     return MODEL_SELECTION
@@ -768,7 +776,7 @@ async def model_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
 
         await query.message.reply_text(
-            f"Select model of {brand}:",
+            f"Select model of {brand}:\nВиберіть модель {brand}:",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return MODEL_SELECTION
@@ -787,7 +795,7 @@ async def model_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
 
     await query.message.reply_text(
-        "Enter vehicle call sign (e.g. HP-12): \nВведіть внутрішній номер авто (напр. HP-12):",
+        "Enter vehicle call sign (e.g. HP-12):\nВведіть внутрішній номер авто (напр. HP-12):",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]])
     )
     return SERIAL
@@ -804,7 +812,7 @@ async def serial_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not re.fullmatch(r"[A-Z]{2}-\d{2}", text):
         await update.message.reply_text(
-            "❌ Невірный формат номера авто. Формат повинен бути:(напр. HP-12)\nTry again | Спробуйте ще раз:"
+            "❌ Формат повинен бути:(напр. HP-12)\n        Format must be:(e.g. HP-12)"
         )
         return SERIAL
 
@@ -816,7 +824,7 @@ async def serial_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard.append([InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")])
 
     await update.message.reply_text(
-        "Choose Allocation | Оберіть Allocation:",
+        "Choose Allocation:\nОберіть Allocation:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     return ALLOCATION
@@ -844,7 +852,7 @@ async def allocation_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYP
         try: await query.message.delete()
         except: pass
         await query.message.reply_text(
-            "Enter vehicle call sign (e.g. HP-12) | Введіть внутрішній номер авто (напр. HP-12):",
+            "Enter vehicle call sign (e.g. HP-12):\nВведіть внутрішній номер авто (напр. HP-12):",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]])
         )
         return SERIAL
@@ -855,12 +863,12 @@ async def allocation_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYP
         keyboard.append([InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")])
         try:
             await query.message.edit_text(
-                "Choose sub-allocation for OPS/SUPP | Оберіть підрозподіл для OPS/SUPP:",
+                "Choose sub-allocation for OPS/SUPP:\nОберіть підрозподіл для OPS/SUPP:",
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
         except:
             await query.message.reply_text(
-                "Choose sub-allocation for OPS/SUPP | Оберіть підрозподіл для OPS/SUPP:",
+                "Choose sub-allocation for OPS/SUPP:\nОберіть підрозподіл для OPS/SUPP:",
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
         return ALLOCATION
@@ -872,7 +880,7 @@ async def allocation_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYP
         try: await query.message.delete()
         except: pass
         await query.message.reply_text(
-            "Enter your full name | Введіть ваше ім'я та прізвище:",
+            "Enter your full name:\nВведіть ваше ім'я та прізвище:",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]])
         )
         return USER
@@ -883,7 +891,7 @@ async def allocation_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYP
         try: await query.message.delete()
         except: pass
         await query.message.reply_text(
-            f"Enter team number for {selection.upper()} | Введіть номер команди для {selection.upper()}:",
+            f"Enter team number for {selection.upper()}:\nВведіть номер команди для {selection.upper()}:",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]])
         )
         return TEAM_NUMBER
@@ -894,7 +902,7 @@ async def allocation_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYP
         try: await query.message.delete()
         except: pass
         await query.message.reply_text(
-            "Enter your full name | Введіть ваше ім'я та прізвище:",
+            "Enter your full name:\nВведіть ваше ім'я та прізвище:",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]])
         )
         return USER
@@ -907,7 +915,7 @@ async def allocation_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYP
         try: await query.message.delete()
         except: pass
         await query.message.reply_text(
-            f"Enter team number for {selection.upper()} | Введіть номер команди для {selection.upper()}:",
+            f"Enter team number for {selection.upper()}:\nВведіть номер команди для {selection.upper()}:",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]])
         )
         return TEAM_NUMBER
@@ -918,7 +926,7 @@ async def allocation_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYP
         try: await query.message.delete()
         except: pass
         await query.message.reply_text(
-            "Enter your full name | Введіть ваше ім'я та прізвище:",
+            "Enter your full name:\nВведіть ваше ім'я та прізвище:",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]])
         )
         return USER
@@ -934,8 +942,8 @@ async def team_number_input_mfr(update: Update, context: ContextTypes.DEFAULT_TY
     allocation = context.user_data.get('allocation')
     set_cell(ws, "F9", f"{allocation}-{text}")
     await update.message.reply_text(
-        "Enter your full name | Введіть Ім'я та прізвище:",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]])
+        "Enter your full name:\nВведіть Ім'я та прізвище:",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
     )
     return USER
 
@@ -955,7 +963,7 @@ async def user_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     set_cell(ws, "C22", datetime.now().strftime("%Y-%m-%d"))
     set_cell(ws, "F12", datetime.now().strftime("%Y-%m-%d"))
     await update.message.reply_text(
-        "Briefly describe the situation | Коротко опишіть ситуацію:",
+        "Briefly describe the situation:\nКоротко опишіть ситуацію:",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]])
     )
     return DESCRIPTION
@@ -990,7 +998,7 @@ def split_text(text, words_per_line=20):
 async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if not text:
-        await update.message.reply_text("❌ Describe the situation / ❌ Опишіть ситуацію")
+        await update.message.reply_text("❌ Describe the situation:\n❌ Опишіть ситуацію")
         return DESCRIPTION
 
     text_en = await translate_to_en(text)
@@ -1042,10 +1050,10 @@ async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TY
             text=f"📄 Новий MFR звіт по локації {location} від {user_name}"
     )
 
- 
+
 
     context.user_data.clear()
-    await update.message.reply_text("✅ Your report has been sent! / ✅ Звіт надіслано!")
+    await update.message.reply_text("✅ Your report has been sent!\n✅ Звіт надіслано!")
 
     # --- Приветственное фото ---
     logo_bytes_start = get_logo_bytes()
@@ -1075,7 +1083,7 @@ async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TY
 
 #===================================================================CONTACTS====================================================
 
-#@restricted
+@restricted
 async def contacts_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -1091,7 +1099,7 @@ async def contacts_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = (
         "📌 Locations / Локації:\n"
-        "Select a location to see contacts | Оберіть локацію для контактів:"
+        "Select a location to see contacts:\nОберіть локацію для контактів:"
     )
 
     keyboard = [
@@ -1112,7 +1120,7 @@ async def contacts_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 #Обработчик конкретной локации
-#@restricted
+@restricted
 async def contact_location_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -1192,8 +1200,11 @@ LOCATIONS = {
             "email": "RomKuc884@npaid.org"
         },
         "car_washes": [
-            {"name": "Car Wash 1", "phone": "+380 432 000 001", "map": "https://goo.gl/maps/carwash1_mykolaiv"},
-            {"name": "Car Wash 2", "phone": "+380 432 000 002", "map": "https://goo.gl/maps/carwash2_mykolaiv"},
+            {"name": "AVTOSMILE", "phone": "+380 95 792 35 94", "map": "https://maps.app.goo.gl/Xc2b4q8CWEHERMtL9"},
+            {"name": "VIANOR", "phone": "+380 50 495 60 85", "map": "https://maps.app.goo.gl/HQw66xsakjPp245T6"},
+            {"name": "FOP MARGOLIN", "phone": "+380 63 035 23 02", "map": "https://maps.app.goo.gl/xFFs9e6gsxMEAXccA"},
+            {"name": "AVTORELAX", "phone": "No number, yet", "map": "https://maps.app.goo.gl/YqjpXX8FSgbz3PVV6"},
+            {"name": "FOP Shevchenko", "phone": "+380 97 438 25 38", "map": "https://maps.app.goo.gl/3SU1snMcijN48ehq8"},
         ],
         "tire_services": [
             {"name": "Tire Service 1", "phone": "+380 432 111 001", "map": "https://goo.gl/maps/tire1_mykolaiv"},
@@ -1202,7 +1213,7 @@ LOCATIONS = {
     }
 }
 
-#@restricted
+@restricted
 async def contact_location_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
