@@ -10,7 +10,7 @@ from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler,
     MessageHandler, ConversationHandler, filters, ContextTypes
 )
-
+import json
 from openpyxl import load_workbook
 from openpyxl.drawing.image import Image
 from openpyxl.styles import Alignment
@@ -117,52 +117,26 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # если нужно ограничить доступ — ставишь True
 RESTRICTED_MODE = True
 
+# =================== Работа с JSON ===================
+USERS_JSON = "allowed_users.json"
+
+def load_allowed_users():
+    if os.path.exists(USERS_JSON):
+        with open(USERS_JSON, "r", encoding="utf-8") as f:
+            return {int(k): v for k, v in json.load(f).items()}
+    return {}
+
+def save_allowed_users():
+    with open(USERS_JSON, "w", encoding="utf-8") as f:
+        json.dump({str(k): v for k, v in ALLOWED_USERS.items()}, f, ensure_ascii=False, indent=4)
+
+ALLOWED_USERS = load_allowed_users()
 
 
 
 
 
-# =================== Старт ===================
-
-ALLOWED_USERS = {
-    #FLEET
-    507775858: "Oleksandr Rudnov",
-    6488832046: "Andriy Padalka",
-
-    #BIGBOSS
-    6093640376: "Roman Kucherevskyi",
-
-    #SHY
-    #MTT
-    787549014: "Anastasia Vesloguzova",
-    513781701: "Dmytro Safonenko",
-    576130995: "Andrii Diomin",
-
-    #TFM
-    5867471783: "Gary Mc Bride",
-
-    #NTS
-    528557238: "Vladyslav Prikhodko",
-    702797267: "Maksym Shevchenko",
-    1337501641: "Vladyslav Kotliarov",
-    
-
-    #FIELD ASSISTANT
-    1917157862: "Polina Hryshko",
-    355265317: "Vadym Dubrivnyi",
-
-    #MECH
-    1786562045: "Viacheslav Len",
-    
-
-    #MYK
-    #MTT
-    #NTS
-    #SUPPORT
-
-}
-
-
+# =================== Ограничение доступа ===================
 def restricted(func):
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
         user_id = update.effective_user.id
@@ -175,6 +149,78 @@ def restricted(func):
             return
         return await func(update, context, *args, **kwargs)
     return wrapper
+
+
+# =================== Команды добавления/удаления пользователей ===================
+@restricted
+async def add_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id != ADMIN_ID:
+        await update.message.reply_text("⛔ Только админ может добавлять пользователей")
+        return
+
+    args = context.args
+    if len(args) < 2:
+        await update.message.reply_text("Использование: /add_user <tg_id> <имя>")
+        return
+
+    try:
+        new_id = int(args[0])
+        name = " ".join(args[1:])
+        ALLOWED_USERS[new_id] = name
+        save_allowed_users()
+        await update.message.reply_text(f"✅ Пользователь {name} ({new_id}) добавлен в список разрешённых")
+    except ValueError:
+        await update.message.reply_text("⛔ Неверный ID")
+
+@restricted
+async def remove_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id != ADMIN_ID:
+        await update.message.reply_text("⛔ Только админ может удалять пользователей")
+        return
+
+    args = context.args
+    if len(args) != 1:
+        await update.message.reply_text("Использование: /remove_user <tg_id>")
+        return
+
+    try:
+        del_id = int(args[0])
+        if del_id in ALLOWED_USERS:
+            name = ALLOWED_USERS.pop(del_id)
+            save_allowed_users()
+            await update.message.reply_text(f"✅ Пользователь {name} ({del_id}) удалён")
+        else:
+            await update.message.reply_text("⛔ Пользователь не найден")
+    except ValueError:
+        await update.message.reply_text("⛔ Неверный ID")
+
+# =======================================================================================================
+
+
+
+#=================================Список пользователей на екран ТГ бота==================================
+@restricted
+async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id != ADMIN_ID:
+        await update.message.reply_text("⛔ Только админ может просматривать список пользователей")
+        return
+
+    if not ALLOWED_USERS:
+        await update.message.reply_text("Список пользователей пуст.")
+        return
+
+    text = "📋 Список разрешённых пользователей:\n\n"
+    for uid, name in ALLOWED_USERS.items():
+        text += f"- {name} ({uid})\n"
+
+    await update.message.reply_text(text)
+# =======================================================================================================
+
+
+
 
 @restricted
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -598,12 +644,6 @@ async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TY
 
     
 
-    # Логотип
-    # logo_path = os.path.join(os.path.dirname(__file__), "logo", "Лого ексель.png")
-    # img = Image(logo_path)
-    # img.width, img.height = 1069, 194
-    # ws.add_image(img, "A1")
-
     plate = ws["F7"].value or "CAR"
     filename = f"LDR_{plate}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.xlsx"
 
@@ -994,23 +1034,6 @@ async def user_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =================== Описание ===================
 
 
-
-# async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     text = update.message.text.strip()
-#     if not text:
-#         await update.message.reply_text("❌ Describe the situation / ❌ Опишіть ситуацію")
-#         return DESCRIPTION
-
-#     text_en = await translate_to_en(text)
-#     ws = context.user_data['ws']
-
-#     # --- Записываем текст в одну ячейку и выравниваем ---
-#     ws["B16"] = text_en
-#     ws["B16"].alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
-
-
-
-
 def split_text(text, words_per_line=20):
     """Разбивает текст на строки примерно по N слов"""
     words = text.split()
@@ -1038,17 +1061,11 @@ async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TY
         cell.alignment = Alignment(horizontal="left", vertical="bottom")
 
 
-    # # --- Автоподгонка высоты ячейки под текст ---
-    # auto_height_for_cell(ws, "B16", min_height=50)
 
     # --- Подгонка остальных ячеек ---
     auto_adjust(ws, ["F5", "C6", "C9", "F9", "I6", "F22", "C22"])
 
-    # # --- Лого ---
-    # logo_path = os.path.join(os.path.dirname(__file__), "logo", "Лого ексель.png")
-    # img = Image(logo_path)
-    # img.width, img.height = 396, 72
-    # ws.add_image(img, "B2")
+    
 
     plate = ws["F5"].value or "CAR"
     filename = f"MFR_{plate}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.xlsx"
@@ -1372,7 +1389,10 @@ def main():
     app.add_handler(CallbackQueryHandler(contacts_callback, pattern="contacts"))
     
 
-
+    # Команды администратора
+    app.add_handler(CommandHandler("add_user", add_user))
+    app.add_handler(CommandHandler("remove_user", remove_user))
+    app.add_handler(CommandHandler("list_users", list_users))
 
 
     app.add_handler(CallbackQueryHandler(cancel, pattern="cancel"))
