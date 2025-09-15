@@ -156,12 +156,12 @@ def restricted(func):
 async def add_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != ADMIN_ID:
-        await update.message.reply_text("⛔ Только админ может добавлять пользователей")
+        await update.message.reply_text("⛔ Лише адміністратор може додавати користувачів.")
         return
 
     args = context.args
     if len(args) < 2:
-        await update.message.reply_text("Использование: /add_user <tg_id> <имя>")
+        await update.message.reply_text("Використання: /add_user <tg_id> <ім'я>")
         return
 
     try:
@@ -169,20 +169,20 @@ async def add_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         name = " ".join(args[1:])
         ALLOWED_USERS[new_id] = name
         save_allowed_users()
-        await update.message.reply_text(f"✅ Пользователь {name} ({new_id}) добавлен в список разрешённых")
+        await update.message.reply_text(f"✅ Користувача {name} ({new_id}) додано до списку дозволених")
     except ValueError:
-        await update.message.reply_text("⛔ Неверный ID")
+        await update.message.reply_text("⛔ Невірний ID")
 
 @restricted
 async def remove_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != ADMIN_ID:
-        await update.message.reply_text("⛔ Только админ может удалять пользователей")
+        await update.message.reply_text("⛔ Лише адміністратор може видаляти користувачів.")
         return
 
     args = context.args
     if len(args) != 1:
-        await update.message.reply_text("Использование: /remove_user <tg_id>")
+        await update.message.reply_text("Використання: /remove_user <tg_id>")
         return
 
     try:
@@ -190,11 +190,11 @@ async def remove_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if del_id in ALLOWED_USERS:
             name = ALLOWED_USERS.pop(del_id)
             save_allowed_users()
-            await update.message.reply_text(f"✅ Пользователь {name} ({del_id}) удалён")
+            await update.message.reply_text(f"✅ Користувача {name} ({del_id}) видалено")
         else:
-            await update.message.reply_text("⛔ Пользователь не найден")
+            await update.message.reply_text("⛔ Користувача не знайдено")
     except ValueError:
-        await update.message.reply_text("⛔ Неверный ID")
+        await update.message.reply_text("⛔ Невірний ID")
 
 # =======================================================================================================
 
@@ -205,14 +205,14 @@ async def remove_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != ADMIN_ID:
-        await update.message.reply_text("⛔ Только админ может просматривать список пользователей")
+        await update.message.reply_text("⛔ Лише адміністратор може переглядати список користувачів")
         return
 
     if not ALLOWED_USERS:
-        await update.message.reply_text("Список пользователей пуст.")
+        await update.message.reply_text("Список користувачів порожній.")
         return
 
-    text = "📋 Список разрешённых пользователей:\n\n"
+    text = "📋 Список дозволених користувачів:\n\n"
     for uid, name in ALLOWED_USERS.items():
         text += f"- {name} ({uid})\n"
 
@@ -236,17 +236,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return  # прекращаем выполнение
         
 
-
-#@restricted
-# async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     user_id = update.effective_user.id
-#     if user_id not in ALLOWED_USERS:
-#         if update.message:
-#             await update.message.reply_text("⛔ Доступ заборонений")
-#         elif update.callback_query:
-#             await update.callback_query.answer()
-#             await update.callback_query.message.reply_text("⛔ Доступ заборонений")
-#         return  # прекращаем выполнение, дальше ничего не делаем
 
     # очищаем user_data
     context.user_data.clear()
@@ -322,8 +311,6 @@ async def ldr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 @restricted
-
-
 async def ldr_request_type_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -420,15 +407,6 @@ async def ldr_other_request_input(update: Update, context: ContextTypes.DEFAULT_
 # =================== Ввод данных ===================
 
 
-
-
-
-
-
-
-
-
-
 async def serial_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip().upper()  # переводим в верхний регистр
     text = text.replace(" ", "")  # убираем пробелы
@@ -440,7 +418,7 @@ async def serial_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # проверка формата: две буквы - дефис - две цифры
     if not re.fullmatch(r"[A-Z]{2}-\d{2}", text):
         await update.message.reply_text(
-            "❌ Формат повинен бути:(напр. HP-12)\n        Format must be:(e.g. HP-12)"
+            "❌ Формат повинен бути:(напр. HP-01)\n        Format must be:(e.g. HP-01)"
         )
         return SERIAL
 
@@ -485,7 +463,7 @@ async def allocation_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYP
         try: await query.message.delete()
         except: pass
         await query.message.reply_text(
-            "Enter vehicle call sign (e.g. HP-12): \nВведіть внутрішній номер авто (напр. HP-12):",
+            "Enter vehicle call sign (e.g. HP-01): \nВведіть внутрішній номер авто (напр. HP-01):",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]])
         )
         return SERIAL
@@ -566,7 +544,7 @@ async def user_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     set_cell(ws, "F21", manager_fa)
     set_cell(ws, "C21", datetime.now().strftime("%Y-%m-%d"))
     await update.message.reply_text(
-        "Briefly describe the situation:\nКоротко опишіть ситуацію:",
+        "Detailed description of events leading to the loss or damage:\nДетальний опис подій, що призвели до втрати або пошкодження:",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
     )
     return DESCRIPTION
@@ -856,7 +834,7 @@ async def model_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
 
     await query.message.reply_text(
-        "Enter vehicle call sign (e.g. HP-12):\nВведіть внутрішній номер авто (напр. HP-12):",
+        "Enter vehicle call sign (e.g. HP-01):\nВведіть внутрішній номер авто (напр. HP-01):",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]])
     )
     return SERIAL
@@ -873,7 +851,7 @@ async def serial_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not re.fullmatch(r"[A-Z]{2}-\d{2}", text):
         await update.message.reply_text(
-            "❌ Формат повинен бути:(напр. HP-12)\n        Format must be:(e.g. HP-12)"
+            "❌ Формат повинен бути:(напр. HP-01)\n        Format must be:(e.g. HP-01)"
         )
         return SERIAL
 
@@ -913,7 +891,7 @@ async def allocation_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYP
         try: await query.message.delete()
         except: pass
         await query.message.reply_text(
-            "Enter vehicle call sign (e.g. HP-12):\nВведіть внутрішній номер авто (напр. HP-12):",
+            "Enter vehicle call sign (e.g. HP-01):\nВведіть внутрішній номер авто (напр. HP-01):",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]])
         )
         return SERIAL
@@ -1024,7 +1002,7 @@ async def user_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     set_cell(ws, "C22", datetime.now().strftime("%Y-%m-%d"))
     set_cell(ws, "F12", datetime.now().strftime("%Y-%m-%d"))
     await update.message.reply_text(
-        "Briefly describe the situation:\nКоротко опишіть ситуацію:",
+        "Detailed description of events leading to the loss or damage:\n__________________________________\nДетальний опис подій, що призвели до втрати або пошкодження:",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]])
     )
     return DESCRIPTION
