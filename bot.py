@@ -272,6 +272,8 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 MANAGERS = {
     "Shyroke": [ADMIN_ID],
     "Mykolaiv": [6093640376, 6488832046],
+    "Kyiv": [ADMIN_ID],     
+    "Sumy/Romny": [ADMIN_ID]
 }
 
 
@@ -355,6 +357,8 @@ async def ldr_request_type_callback(update: Update, context: ContextTypes.DEFAUL
     keyboard = [
         [InlineKeyboardButton("Shyroke", callback_data="Shyroke")],
         [InlineKeyboardButton("Mykolaiv", callback_data="Mykolaiv")],
+        [InlineKeyboardButton("Kyiv", callback_data="Kyiv")],
+        [InlineKeyboardButton("Sumy/Romny", callback_data="Sumy/Romny")],
         [InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]
     ]
     try: await query.message.delete()
@@ -396,6 +400,8 @@ async def ldr_other_request_input(update: Update, context: ContextTypes.DEFAULT_
     keyboard = [
         [InlineKeyboardButton("Shyroke", callback_data="Shyroke")],
         [InlineKeyboardButton("Mykolaiv", callback_data="Mykolaiv")],
+        [InlineKeyboardButton("Kyiv", callback_data="Kyiv")],
+        [InlineKeyboardButton("Sumy/Romny", callback_data="Sumy/Romny")],
         [InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]
     ]
     await update.message.reply_text(
@@ -427,7 +433,7 @@ async def serial_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Первый уровень Allocation
     keyboard = [
-        [InlineKeyboardButton(x, callback_data=x)] for x in ["MTT","MDD","MECH","NTS","OPS/SUPP"]
+        [InlineKeyboardButton(x, callback_data=x)] for x in ["MTT","MDD","MECH","NTS","OPS/SUPP","ADMIN"]
     ]
     keyboard.append([InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")])
 
@@ -457,7 +463,7 @@ async def allocation_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYP
         return await cancel(update, context)
 
     # Локации Shyroke / Mykolaiv
-    if selection in ["Shyroke", "Mykolaiv"]:
+    if selection in ["Shyroke", "Mykolaiv", "Kyiv", "Sumy/Romny"]:
         context.user_data['location'] = selection
         set_cell(ws, "C10", selection)
         try: await query.message.delete()
@@ -504,10 +510,12 @@ async def allocation_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYP
         return TEAM_NUMBER
 
     # Если MECH — просто записываем в Excel и спрашиваем имя
-    if selection.upper() == "MECH":
-        set_cell(ws, "F10", "MECH")
-        try: await query.message.delete()
-        except: pass
+    if selection.upper() in ("MECH", "ADMIN"):
+        set_cell(ws, "F10", selection.upper())
+        try: 
+            await query.message.delete()
+        except: 
+            pass
         await query.message.reply_text(
             "Enter your full name:\nВведіть ваше Ім'я та прізвище:",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]])
@@ -540,7 +548,10 @@ async def user_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     set_cell(ws, "I7", user_name_latin)
     set_cell(ws, "B21", user_name_latin)
     location = context.user_data.get('location')
-    manager_fa = {"Shyroke":"F.A. Oleksandr Rudnov","Mykolaiv":"F.A. Andriy Padalka"}.get(location,"F.A. Unknown")
+    manager_fa = {"Shyroke": "F.A. Oleksandr Rudnov",
+                  "Mykolaiv": "F.A. Andriy Padalka",
+                  "Kyiv": "F.A. Oleksandr Rudnov",
+                  "Sumy/Romny": "F.A. Oleksandr Rudnov"}.get(location,"F.A. Unknown")
     set_cell(ws, "F21", manager_fa)
     set_cell(ws, "C21", datetime.now().strftime("%Y-%m-%d"))
     await update.message.reply_text(
@@ -647,7 +658,7 @@ async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TY
     context.user_data.clear()
 
     # Уведомление пользователю
-    await update.message.reply_text("✅ Your report has been sent!:\n✅ Звіт надіслано!")
+    await update.message.reply_text("✅ Звіт надіслано Fleet співробітнику, відповідно до обраної локації.\nВам залишилось лише підписати його.\n\n✅ The report has been sent to the Fleet of chosen location.\n You only need to sign it.")
 
     # Приветственное фото с кнопкой
     logo_bytes_start = get_logo_bytes()
@@ -720,6 +731,8 @@ async def mfr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("Shyroke", callback_data="Shyroke")],
         [InlineKeyboardButton("Mykolaiv", callback_data="Mykolaiv")],
+        [InlineKeyboardButton("Kyiv", callback_data="Kyiv")],
+        [InlineKeyboardButton("Sumy/Romny", callback_data="Sumy/Romny")],
         [InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]
     ]
     # -------------------------------------------------------
@@ -859,7 +872,7 @@ async def serial_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     set_cell(ws, "F6", text)
 
     # Первый уровень Allocation
-    keyboard = [[InlineKeyboardButton(x, callback_data=x)] for x in ["MTT", "MDD", "MECH", "NTS", "OPS/SUPP"]]
+    keyboard = [[InlineKeyboardButton(x, callback_data=x)] for x in ["MTT", "MDD", "MECH", "NTS", "OPS/SUPP", "ADMIN"]]
     keyboard.append([InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")])
 
     await update.message.reply_text(
@@ -885,7 +898,7 @@ async def allocation_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYP
         return await cancel(update, context)
 
     # Локации Shyroke / Mykolaiv
-    if selection in ["Shyroke", "Mykolaiv"]:
+    if selection in ["Shyroke", "Mykolaiv", "Kyiv", "Sumy/Romny"]:
         context.user_data['location'] = selection
         set_cell(ws, "C9", selection)
         try: await query.message.delete()
@@ -936,40 +949,17 @@ async def allocation_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYP
         return TEAM_NUMBER
 
     # MECH — просто записываем и спрашиваем имя
-    if selection.upper() == "MECH":
-        set_cell(ws, "F9", "MECH")
-        try: await query.message.delete()
-        except: pass
+    if selection.upper() in ("MECH", "ADMIN"):
+        set_cell(ws, "F8", selection.upper())
+        try: 
+            await query.message.delete()
+        except: 
+            pass
         await query.message.reply_text(
-            "Enter your full name:\nВведіть ваше ім'я та прізвище:",
+            "Enter your full name:\nВведіть ваше Ім'я та прізвище:",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]])
         )
         return USER
-
-
-
-    # Если MTT, MDD, NTS — спрашиваем номер команды
-    if selection.upper() in ["MTT", "MDD", "NTS"]:
-        context.user_data['allocation'] = selection.upper()
-        try: await query.message.delete()
-        except: pass
-        await query.message.reply_text(
-            f"Enter team number for {selection.upper()}:\nВведіть номер команди для {selection.upper()}:",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]])
-        )
-        return TEAM_NUMBER
-
-    # Если MECH — просто записываем в Excel и спрашиваем имя
-    if selection.upper() == "MECH":
-        set_cell(ws, "F9", "MECH")
-        try: await query.message.delete()
-        except: pass
-        await query.message.reply_text(
-            "Enter your full name:\nВведіть ваше ім'я та прізвище:",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]])
-        )
-        return USER
-
 
 
 async def team_number_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -997,7 +987,10 @@ async def user_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     set_cell(ws, "I6", user_name_latin)
     set_cell(ws, "B22", user_name_latin)
     location = context.user_data.get('location')
-    manager_fa = {"Shyroke":"F.A. Oleksandr Rudnov","Mykolaiv":"F.A. Andriy Padalka"}.get(location,"F.A. Unknown")
+    manager_fa = {"Shyroke": "F.A. Oleksandr Rudnov",
+                  "Mykolaiv": "F.A. Andriy Padalka",
+                  "Kyiv": "F.A. Oleksandr Rudnov",
+                  "Sumy/Romny": "F.A. Oleksandr Rudnov"}.get(location,"F.A. Unknown")
     set_cell(ws, "F22", manager_fa)
     set_cell(ws, "C22", datetime.now().strftime("%Y-%m-%d"))
     set_cell(ws, "F12", datetime.now().strftime("%Y-%m-%d"))
@@ -1069,7 +1062,7 @@ async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TY
 
 
     context.user_data.clear()
-    await update.message.reply_text("✅ Your report has been sent!\n✅ Звіт надіслано!")
+    await update.message.reply_text("✅ Звіт надіслано Fleet співробітнику, відповідно до обраної локації.\nВам залишилось лише підписати його.\n\n✅ The report has been sent to the Fleet of chosen location.\n You only need to sign it.")
 
     # --- Приветственное фото ---
     logo_bytes_start = get_logo_bytes()
@@ -1305,7 +1298,7 @@ def main():
     # LDR Conversation
     ldr_conv = ConversationHandler(
         entry_points=[
-            CallbackQueryHandler(ldr_request_type_callback, pattern="^(flat_tire|wipers|Drivers_card|other_request)$")
+            CallbackQueryHandler(ldr_request_type_callback, pattern="^(flat_tire|other_request)$")
         ],
         states={
             SERIAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, serial_input_ldr)],
@@ -1330,7 +1323,7 @@ def main():
         states={
             # ------------------- Локации -------------------
             ALLOCATION: [
-                CallbackQueryHandler(mfr_location_selection, pattern="^(Shyroke|Mykolaiv)$"),
+                CallbackQueryHandler(mfr_location_selection, pattern="^(Shyroke|Mykolaiv|Kyiv|Sumy/Romny)$"),
                 CallbackQueryHandler(allocation_input_mfr)  # все остальные аллокации
             ],
 
