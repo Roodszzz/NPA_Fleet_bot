@@ -863,7 +863,7 @@ async def serial_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     set_cell(ws, "F6", text)
 
     await update.message.reply_text(
-        "Enter odometer reading (km):\nВведіть показник одометра (км):",
+        "Enter odometer reading (km):\nВведіть поточний пробіг (км):",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]])
     )
     return MFR_ODOMETER
@@ -1024,7 +1024,7 @@ async def user_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     set_cell(ws, "F12", datetime.now().strftime("%Y-%m-%d"))
 
     await update.message.reply_text(
-        "Detailed description of events leading to the loss or damage:\n__________________________________\nДетальний опис подій, що призвели до втрати або пошкодження:",
+        "Please describe the mechanical issue in detail:\nБудь ласка, опишіть механічну несправність детально:",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]])
     )
     return MFR_DESCRIPTION
