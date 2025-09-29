@@ -91,7 +91,7 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("LDR (Lost / Damage) | Втрачено або пошкоджено", callback_data="ldr")],
         [InlineKeyboardButton("MFR (Mechanical failure) | Механічне пошкодження авто", callback_data="mfr")],
         [InlineKeyboardButton("Contacts | Контакти", callback_data="contacts")],
-        [InlineKeyboardButton("🚨 Порядок дій при ДТП", callback_data="accident_procedure")],
+        [InlineKeyboardButton("🚨 Порядок дій при ДТП | Accident Procedure", callback_data="accident_procedure")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     text = ("🇬🇧 EN\n"
