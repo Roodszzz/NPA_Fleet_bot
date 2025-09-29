@@ -91,7 +91,7 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("LDR (Lost / Damage) | Втрачено або пошкоджено", callback_data="ldr")],
         [InlineKeyboardButton("MFR (Mechanical failure) | Механічне пошкодження авто", callback_data="mfr")],
         [InlineKeyboardButton("Contacts | Контакти", callback_data="contacts")],
-        #[InlineKeyboardButton("Other questions | Інші питання", callback_data="other_questions")]
+        [InlineKeyboardButton("🚨 Порядок дій при ДТП", callback_data="accident_procedure")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     text = ("🇬🇧 EN\n"
@@ -278,7 +278,116 @@ MANAGERS = {
 
 
 
+#==========================================================================DAMAGE================================================================
+# Інструкція при ДТП - головний пункт
+@restricted
+async def accident_procedure_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
 
+    text = "🌐 Оберіть мову / Choose language:"
+
+    keyboard = [
+        [InlineKeyboardButton("🇺🇦 Українська", callback_data="accident_procedure_ua")],
+        [InlineKeyboardButton("🇬🇧 English", callback_data="accident_procedure_en")],
+        [InlineKeyboardButton("⬅️ В головне меню", callback_data="main_menu")]
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    try:
+        await query.message.delete()
+    except:
+        pass
+
+    await query.message.reply_text(text=text, reply_markup=reply_markup)
+
+
+# Інструкція при ДТП - українська
+@restricted
+async def accident_procedure_ua_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    text = (
+    "🚨 **Порядок дій при ДТП** 🚨\n\n"
+    "1️⃣ Негайно зверніться до місцевих органів влади, офісу NPA та співробітника автопарку, який контролює вашу подорож.\n"
+    "2️⃣ Убезпечте місце аварії: виставте попереджувальний трикутник та попереджайте інший транспорт.\n"
+    "3️⃣ Забезпечте комфорт потерпілим, не переміщуйте їх без необхідності.\n"
+    "4️⃣ У разі потреби організуйте доставку поранених до лікарні.\n"
+    "5️⃣ Не переміщуйте транспортний засіб до прибуття поліції.\n"
+    "6️⃣ Не визнавайте жодної відповідальності.\n"    
+    "7️⃣ Не залишайте місце ДТП.\n"
+    "8️⃣ Фіксуйте подію (фото/відео), якщо це безпечно.\n"
+    "9️⃣ Захистіть особисті речі.\n"
+    "🔟 Уникайте суперечок з іншими учасниками.\n"
+    "1️⃣1️⃣ Візьміть контакти та дані страхування інших учасників.\n"
+    "1️⃣2️⃣ Запишіть марку, модель, колір та номерні знаки інших авто.\n"
+    "1️⃣3️⃣ Підготуйте документи для перевірки поліцією (якщо потрібно, супроводжуйте поліцію до відділку)\n"
+    "1️⃣4️⃣ Отримайте копію протоколу.\n"
+    "1️⃣5️⃣ Повідомте офіцера автопарку, офіцера безпеки та керівника про подію.\n"
+    "1️⃣6️⃣ Заповніть звіт про ДТП (VAR – додаток E) протягом 24 годин.\n"
+)
+
+    keyboard = [
+        [InlineKeyboardButton("⬅️ Назад", callback_data="accident_procedure")],
+        [InlineKeyboardButton("⬅️ В головне меню", callback_data="main_menu")]
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    try:
+        await query.message.delete()
+    except:
+        pass
+
+    await query.message.reply_text(text=text, reply_markup=reply_markup, parse_mode="Markdown")
+
+
+# Інструкція при ДТП - англійська
+@restricted
+async def accident_procedure_en_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    text = (
+    "🚨 **Accident Procedure** 🚨\n\n"
+    "1️⃣ Immediately contact local authorities, the NPA office, and the fleet officer supervising your journey.\n"
+    "2️⃣ Secure the accident site: place a warning triangle and alert approaching traffic.\n"
+    "3️⃣ Ensure comfort for the injured, do not move them unless necessary.\n"
+    "4️⃣ If needed, arrange for the injured to be transported to the hospital.\n"
+    "5️⃣ Do not move the vehicle until the police arrive.\n"
+    "6️⃣ Do not admit any liability.\n"
+    "7️⃣ Do not leave the accident site.\n"
+    "8️⃣ Document the incident (photos/videos) if safe.\n"
+    "9️⃣ Protect your personal belongings.\n"
+    "🔟 Avoid arguments or confrontations with other parties.\n"
+    "1️⃣1️⃣ Obtain contact and insurance details from other parties involved.\n"
+    "1️⃣2️⃣ Record the make, model, color, and registration numbers of other vehicles.\n"
+    "1️⃣3️⃣ Prepare documents for police inspection (if required, accompany the police to the station).\n"
+    "1️⃣4️⃣ Obtain a copy of the police report.\n"
+    "1️⃣5️⃣ Inform the fleet officer, safety officer, and your project manager about the incident.\n"
+    "1️⃣6️⃣ Complete the Vehicle Accident Report (VAR – Annex E) within 24 hours.\n"
+)
+
+
+    keyboard = [
+        [InlineKeyboardButton("⬅️ Back", callback_data="accident_procedure")],
+        [InlineKeyboardButton("⬅️ Main Menu", callback_data="main_menu")]
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    try:
+        await query.message.delete()
+    except:
+        pass
+
+    await query.message.reply_text(text=text, reply_markup=reply_markup, parse_mode="Markdown")
+
+
+
+#=======================================================================END DAMAGE=============================================================================================
 
 
 
@@ -863,7 +972,7 @@ async def serial_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     set_cell(ws, "F6", text)
 
     await update.message.reply_text(
-        "Enter odometer reading (km):\nВведіть показник одометра (км):",
+        "Enter odometer reading (km):\nВведіть поточний пробіг (км):",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel | Відмінити", callback_data="cancel")]])
     )
     return MFR_ODOMETER
@@ -1024,7 +1133,7 @@ async def user_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     set_cell(ws, "F12", datetime.now().strftime("%Y-%m-%d"))
 
     await update.message.reply_text(
-        "Detailed description of events leading to the loss or damage:\n__________________________________\nДетальний опис подій, що призвели до втрати або пошкодження:",
+        "Please describe the mechanical issue in detail:\nБудь ласка, опишіть механічну несправність детально:",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel / Відмінити", callback_data="cancel")]])
     )
     return MFR_DESCRIPTION
@@ -1373,11 +1482,18 @@ def main():
     app.add_handler(CallbackQueryHandler(contacts_callback, pattern="contacts"))
     
 
+    
+
     # Команды администратора
     app.add_handler(CommandHandler("add_user", add_user))
     app.add_handler(CommandHandler("remove_user", remove_user))
     app.add_handler(CommandHandler("list_users", list_users))
 
+
+    # Accident procedures (ДТП)
+    app.add_handler(CallbackQueryHandler(accident_procedure_callback, pattern="^accident_procedure$"))
+    app.add_handler(CallbackQueryHandler(accident_procedure_ua_callback, pattern="^accident_procedure_ua$"))
+    app.add_handler(CallbackQueryHandler(accident_procedure_en_callback, pattern="^accident_procedure_en$"))
 
     app.add_handler(CallbackQueryHandler(cancel, pattern="cancel"))
     app.add_handler(CallbackQueryHandler(contacts_callback, pattern="^contacts$"))
