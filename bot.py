@@ -16,6 +16,7 @@ from openpyxl.drawing.image import Image
 from openpyxl.styles import Alignment
 from googletrans import Translator
 import math
+import asyncio
 
 
 
@@ -792,6 +793,11 @@ async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TY
 
     # Уведомление пользователю
     await update.message.reply_text("✅ Звіт надіслано Fleet співробітнику, відповідно до обраної локації.\nВам залишилось лише підписати його.\n\n✅ The report has been sent to the Fleet of chosen location.\n You only need to sign it.")
+    
+    
+    # Задержка 3 секунды
+    await asyncio.sleep(5)
+
 
     # Приветственное фото с кнопкой
     logo_bytes_start = get_logo_bytes()
@@ -1184,6 +1190,11 @@ async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TY
         "✅ Звіт надіслано Fleet співробітнику, відповідно до обраної локації.\nВам залишилось лише підписати його.\n\n✅ The report has been sent to the Fleet of chosen location.\n You only need to sign it."
     )
 
+
+    # Задержка 3 секунды
+    await asyncio.sleep(5)
+
+    
     logo_bytes_start = get_logo_bytes()
     logo_file = InputFile(logo_bytes_start, filename="logo.png")
     keyboard = [[InlineKeyboardButton("Start | Почати", callback_data="main_menu")]]
