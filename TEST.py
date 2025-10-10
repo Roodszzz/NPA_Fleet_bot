@@ -16,6 +16,7 @@ from openpyxl.drawing.image import Image
 from openpyxl.styles import Alignment
 from googletrans import Translator
 import math
+import asyncio
 
 
 
@@ -91,7 +92,8 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("LDR (Lost / Damage) | Втрачено або пошкоджено", callback_data="ldr")],
         [InlineKeyboardButton("MFR (Mechanical failure) | Механічне пошкодження авто", callback_data="mfr")],
         [InlineKeyboardButton("Contacts | Контакти", callback_data="contacts")],
-        [InlineKeyboardButton("🚨 Порядок дій при ДТП", callback_data="accident_procedure")],
+        [InlineKeyboardButton("🚨 Порядок дій при ДТП | Accident Procedure", callback_data="accident_procedure")],
+        [InlineKeyboardButton("💰 Pay fine | Сплатити штраф", url="https://t.me/ShtrafyPDRbot")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     text = ("🇬🇧 EN\n"
@@ -412,7 +414,7 @@ async def ldr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     keyboard = [
-        [InlineKeyboardButton("Flat tire | Пошкоджене колесо", callback_data="flat_tire")],
+        [InlineKeyboardButton("Flat tire | Проколоте колесо", callback_data="flat_tire")],
         #[InlineKeyboardButton("Wipers replacement | Заміна дворників", callback_data="wipers")],
         #[InlineKeyboardButton("Driver's card | Водійська карта", callback_data="Drivers_card")],
         [InlineKeyboardButton("Other damage | Інше пошкодження", callback_data="other_request")],
@@ -792,6 +794,11 @@ async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TY
 
     # Уведомление пользователю
     await update.message.reply_text("✅ Звіт надіслано Fleet співробітнику, відповідно до обраної локації.\nВам залишилось лише підписати його.\n\n✅ The report has been sent to the Fleet of chosen location.\n You only need to sign it.")
+    
+    
+    # Задержка 3 секунды
+    await asyncio.sleep(5)
+
 
     # Приветственное фото с кнопкой
     logo_bytes_start = get_logo_bytes()
@@ -1183,6 +1190,11 @@ async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TY
     await update.message.reply_text(
         "✅ Звіт надіслано Fleet співробітнику, відповідно до обраної локації.\nВам залишилось лише підписати його.\n\n✅ The report has been sent to the Fleet of chosen location.\n You only need to sign it."
     )
+
+
+    # Задержка 3 секунды
+    await asyncio.sleep(5)
+
 
     logo_bytes_start = get_logo_bytes()
     logo_file = InputFile(logo_bytes_start, filename="logo.png")

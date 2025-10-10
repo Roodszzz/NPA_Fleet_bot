@@ -93,6 +93,7 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("MFR (Mechanical failure) | Механічне пошкодження авто", callback_data="mfr")],
         [InlineKeyboardButton("Contacts | Контакти", callback_data="contacts")],
         [InlineKeyboardButton("🚨 Порядок дій при ДТП | Accident Procedure", callback_data="accident_procedure")],
+        [InlineKeyboardButton("💰 Pay fine | Сплатити штраф", url="https://t.me/ShtrafyPDRbot")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     text = ("🇬🇧 EN\n"
@@ -413,7 +414,7 @@ async def ldr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     keyboard = [
-        [InlineKeyboardButton("Flat tire | Пошкоджене колесо", callback_data="flat_tire")],
+        [InlineKeyboardButton("Flat tire | Проколоте колесо", callback_data="flat_tire")],
         #[InlineKeyboardButton("Wipers replacement | Заміна дворників", callback_data="wipers")],
         #[InlineKeyboardButton("Driver's card | Водійська карта", callback_data="Drivers_card")],
         [InlineKeyboardButton("Other damage | Інше пошкодження", callback_data="other_request")],
@@ -1194,7 +1195,7 @@ async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TY
     # Задержка 3 секунды
     await asyncio.sleep(5)
 
-    
+
     logo_bytes_start = get_logo_bytes()
     logo_file = InputFile(logo_bytes_start, filename="logo.png")
     keyboard = [[InlineKeyboardButton("Start | Почати", callback_data="main_menu")]]
