@@ -1249,7 +1249,7 @@ async def contacts_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("Shyroke | Широке", callback_data="contact_shyroke"),
             InlineKeyboardButton("Mykolaiv | Миколаїв", callback_data="contact_mykolaiv"),
         ],
-        [InlineKeyboardButton("❌ Back | Назад", callback_data="back")]
+        [InlineKeyboardButton("⬅️ Back | Назад", callback_data="back")]
     ]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1284,7 +1284,7 @@ async def contact_location_callback(update: Update, context: ContextTypes.DEFAUL
         keyboard = [
             [InlineKeyboardButton("Car Wash | Мийка", url="https://goo.gl/maps/carwash_shyroke")],
             [InlineKeyboardButton("Tire Service | Шиномонтаж", url="https://goo.gl/maps/tire_shyroke")],
-            [InlineKeyboardButton("❌ Back | Назад", callback_data="contacts")]
+            [InlineKeyboardButton("⬅️ Back | Назад", callback_data="contacts")]
         ]
     elif data == "contact_mykolaiv":
         text = (
@@ -1296,7 +1296,7 @@ async def contact_location_callback(update: Update, context: ContextTypes.DEFAUL
         keyboard = [
             [InlineKeyboardButton("Car Wash | Мийка", url="https://goo.gl/maps/carwash_mykolaiv")],
             [InlineKeyboardButton("Tire Service | Шиномонтаж", url="https://goo.gl/maps/tire_mykolaiv")],
-            [InlineKeyboardButton("❌ Back | Назад", callback_data="contacts")]
+            [InlineKeyboardButton("⬅️ Back | Назад", callback_data="contacts")]
         ]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1389,20 +1389,20 @@ async def contact_location_callback(update: Update, context: ContextTypes.DEFAUL
         keyboard = [
             [InlineKeyboardButton("🧼 Car Wash | Мийка", callback_data=f"{loc_key}_carwash")],
             [InlineKeyboardButton("🔧 Tire Service | Шиномонтаж", callback_data=f"{loc_key}_tire")],
-            [InlineKeyboardButton("❌ Back | Назад", callback_data="contacts")]
+            [InlineKeyboardButton("⬅️ Back | Назад", callback_data="contacts")]
         ]
     elif data.endswith("_carwash"):
         loc_key = data.split("_")[0]
         text = "🧼 Car Washes | Мийки:\n\n"
         for wash in LOCATIONS[loc_key]["car_washes"]:
             text += f"{wash['name']}\nPhone: {wash['phone']}\nMap: {wash['map']}\n\n"
-        keyboard = [[InlineKeyboardButton("❌ Back | Назад", callback_data=f"contact_{loc_key}")]]
+        keyboard = [[InlineKeyboardButton("⬅️ Back | Назад", callback_data=f"contact_{loc_key}")]]
     elif data.endswith("_tire"):
         loc_key = data.split("_")[0]
         text = "🔧 Tire Services | Шиномонтажі:\n\n"
         for tire in LOCATIONS[loc_key]["tire_services"]:
             text += f"{tire['name']}\nPhone: {tire['phone']}\nMap: {tire['map']}\n\n"
-        keyboard = [[InlineKeyboardButton("❌ Back | Назад", callback_data=f"contact_{loc_key}")]]
+        keyboard = [[InlineKeyboardButton("⬅️ Back | Назад", callback_data=f"contact_{loc_key}")]]
     else:
         return
 
