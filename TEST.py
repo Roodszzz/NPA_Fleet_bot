@@ -91,6 +91,7 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("LDR (Lost / Damage) | Втрачено або пошкоджено", callback_data="ldr")],
         [InlineKeyboardButton("MFR (Mechanical failure) | Механічне пошкодження авто", callback_data="mfr")],
+        [InlineKeyboardButton("Monthly Form | Щомісячний огляд авто", callback_data="monthly_form")],
         [InlineKeyboardButton("Contacts | Контакти", callback_data="contacts")],
         [InlineKeyboardButton("🚨 Порядок дій при ДТП | Accident Procedure", callback_data="accident_procedure")],
         [InlineKeyboardButton("💰 Pay fine | Сплатити штраф", url="https://t.me/ShtrafyPDRbot")],
@@ -1206,9 +1207,362 @@ async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 
-
-
 #=============================================================MFR END=============================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#=============================================================Monthly inspection form=============================================================
+
+import os
+import re
+from datetime import datetime
+from openpyxl import load_workbook
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    ConversationHandler, MessageHandler, CallbackQueryHandler,
+    filters, ContextTypes
+)
+from monthly_questions import MONTHLY_QUESTIONS
+# =================== Константы ===================
+ADMIN_ID = 507775858
+EXCEL_TEMPLATE = os.path.join("excel", "MIF.xlsx")
+RESULT_FOLDER = "Result"
+os.makedirs(RESULT_FOLDER, exist_ok=True)
+
+# =================== FSM состояния ===================
+(SELECT_LOCATION, SELECT_BRAND, REGISTRATION, CALLSIGN, ODOMETER, USER, QUESTION, REASON, PHOTO) = range(9)
+
+# =================== Менеджеры ===================
+MANAGERS = {
+    "Shyroke": [ADMIN_ID],
+    "Mykolaiv": [6093640376, 6488832046],
+    "Kyiv": [ADMIN_ID],
+    "Sumy/Romny": [ADMIN_ID]
+}
+
+# =================== Вопросы ===================
+MONTHLY_QUESTIONS = MONTHLY_QUESTIONS
+
+# =================== Функции для Excel ===================
+def set_cell(ws, cell, value):
+    try:
+        ws[cell].value = value
+    except AttributeError:
+        for merged_range in ws.merged_cells.ranges:
+            if cell in merged_range:
+                ws.cell(row=merged_range.min_row, column=merged_range.min_col, value=value)
+                break
+
+import xlwings as xw
+from datetime import datetime
+import os
+
+def save_all_to_excel(user_data, folder_path, excel_filename):
+    """
+    Сохраняет данные пользователя в Excel-шаблон, полностью сохраняя шрифты и оформление.
+    Использует xlwings, чтобы работать через Excel напрямую.
+    """
+    file_path = os.path.join(folder_path, excel_filename)
+    os.makedirs(folder_path, exist_ok=True)
+
+    # Открываем шаблон
+    wb = xw.Book(os.path.join("excel", "MIF.xlsx"))
+    ws = wb.sheets[0]
+
+    # Заполняем общие данные
+    ws.range("A4").value = datetime.now().strftime("%Y-%m-%d")
+    ws.range("B4").value = user_data.get("brand", "")
+    ws.range("C4").value = user_data.get("registration_number", "")
+    ws.range("E4").value = user_data.get("call_sign", "")
+    ws.range("G4").value = user_data.get("odometer", "")
+    ws.range("H4").value = user_data.get("driver_name", "")
+
+    # Заполняем ответы на вопросы
+    for idx, q_data in enumerate(MONTHLY_QUESTIONS):
+        ans = user_data['answers'].get(idx, {})
+        if ans.get('yes'):
+            ws.range(q_data['yes_cell']).value = "+"
+        if ans.get('no'):
+            ws.range(q_data['no_cell']).value = "-"
+            ws.range(q_data['remark_cell']).value = ans.get('remark', '')
+
+    # Сохраняем результат
+    wb.save(file_path)
+    wb.close()
+    return file_path
+
+
+# =================== START ===================
+async def start_inspection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [InlineKeyboardButton("Shyroke", callback_data="loc_Shyroke")],
+        [InlineKeyboardButton("Mykolaiv", callback_data="loc_Mykolaiv")],
+        [InlineKeyboardButton("Kyiv", callback_data="loc_Kyiv")],
+        [InlineKeyboardButton("Sumy/Romny", callback_data="loc_Sumy/Romny")],
+        [InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]
+    ]
+    msg = update.message or update.callback_query.message
+    await msg.reply_text("Select location\nОберіть локацію:", reply_markup=InlineKeyboardMarkup(keyboard))
+    return SELECT_LOCATION
+
+# =================== LOCATION SELECT ===================
+async def location_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if query.data == "cancel":
+        return await cancel(update, context)
+    context.user_data['location'] = query.data.replace("loc_", "")
+    keyboard = [
+        [InlineKeyboardButton("TOYOTA", callback_data="brand_TOYOTA")],
+        [InlineKeyboardButton("FORD", callback_data="brand_FORD")],
+        [InlineKeyboardButton("MITSUBISHI", callback_data="brand_MITSUBISHI")],
+        [InlineKeyboardButton("VOLKSWAGEN", callback_data="brand_VOLKSWAGEN")],
+        [InlineKeyboardButton("RENAULT DUSTER", callback_data="brand_RENAULT DUSTER")],
+        [InlineKeyboardButton("SKODA KODIAQ", callback_data="brand_SKODA KODIAQ")],
+        [InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]
+    ]
+    await query.message.reply_text("Select car brand\nОберіть марку авто:", reply_markup=InlineKeyboardMarkup(keyboard))
+    return SELECT_BRAND
+
+# =================== BRAND SELECT ===================
+async def brand_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if query.data == "cancel":
+        return await cancel(update, context)
+    context.user_data['brand'] = query.data.replace("brand_", "")
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
+    await query.message.reply_text(
+        "Enter registration number (AA 9999 AA)\nВведіть реєстраційний номер авто:",
+        reply_markup=keyboard
+    )
+    return REGISTRATION
+
+
+# =================== REGISTRATION ===================
+async def registration_input(update, context):
+    text = update.message.text.strip().upper()
+    if text.lower() in ["cancel", "відмінити", "❌"]:
+        return await cancel(update, context)
+    # удаляем все, кроме букв и цифр
+    text_clean = re.sub(r"[^A-Z0-9]", "", text)
+    if len(text_clean) != 8:
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
+        await update.message.reply_text("❌ Неправильний формат. Має бути FF 9999 FF", reply_markup=keyboard)
+        return REGISTRATION
+    # форматируем
+    text_formatted = f"{text_clean[:2]} {text_clean[2:6]} {text_clean[6:]}"
+    context.user_data['registration_number'] = text_formatted
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
+    await update.message.reply_text("Enter call sign (HP-01)\nВведіть внутрішній номер авто:", reply_markup=keyboard)
+    return CALLSIGN
+
+
+# =================== CALLSIGN ===================
+async def call_sign_input(update, context):
+    text = update.message.text.strip().upper().replace(" ", "").replace("_", "")
+    if text.lower() in ["cancel", "відмінити", "❌"]:
+        return await cancel(update, context)
+
+    # Проверка и автоподгонка формата AA-00
+    match = re.fullmatch(r"([A-Z]{2})-?(\d{2})", text)
+    if not match:
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
+        await update.message.reply_text("❌ Формат повинен бути HP-01", reply_markup=keyboard)
+        return CALLSIGN
+
+    # Форматируем как AA-00
+    formatted_call_sign = f"{match[1]}-{match[2]}"
+    context.user_data['call_sign'] = formatted_call_sign
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
+    await update.message.reply_text("Enter odometer reading (km)\nВведіть пробіг авто:", reply_markup=keyboard)
+    return ODOMETER
+
+
+# =================== ODOMETER ===================
+async def odometer_input(update, context):
+    text = update.message.text.strip()
+    if text.lower() in ["cancel", "відмінити", "❌"]:
+        return await cancel(update, context)
+    if not text.isdigit():
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
+        await update.message.reply_text("❌ Одометр повинен бути числом", reply_markup=keyboard)
+        return ODOMETER
+    context.user_data['odometer'] = text
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
+    await update.message.reply_text("Enter your full name\nВведіть ваше ПІБ:", reply_markup=keyboard)
+    return USER
+
+# =================== USER ===================
+async def user_input(update, context):
+    text = update.message.text.strip()
+    if text.lower() in ["cancel", "відмінити", "❌"]:
+        return await cancel(update, context)
+    context.user_data['driver_name'] = text
+    context.user_data['answers'] = {}
+    context.user_data['current_q'] = 0
+    await ask_question(update, context)
+    return QUESTION
+
+# =================== QUESTIONS ===================
+async def ask_question(update, context):
+    idx = context.user_data['current_q']
+    q = MONTHLY_QUESTIONS[idx]['text']
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("Yes / Так", callback_data="yes")],
+        [InlineKeyboardButton("No / Ні", callback_data="no")],
+        [InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]
+    ])
+    msg = update.message or update.callback_query.message
+    if update.callback_query:
+        await update.callback_query.answer()
+    await msg.reply_text(q, reply_markup=keyboard)
+
+async def handle_question(update, context):
+    query = update.callback_query
+    await query.answer()
+    if query.data == "cancel":
+        return await cancel(update, context)
+    idx = context.user_data['current_q']
+    if query.data == "yes":
+        context.user_data['answers'][idx] = {'yes': True}
+        context.user_data['current_q'] += 1
+        if context.user_data['current_q'] >= len(MONTHLY_QUESTIONS):
+            return await finish_form(update, context)
+        await ask_question(update, context)
+        return QUESTION
+    else:
+        await query.message.reply_text("Enter reason\nВведіть зауваження:")
+        return REASON
+
+# =================== REASON ===================
+async def handle_reason(update, context):
+    text = update.message.text.strip()
+    if text.lower() in ["cancel", "відмінити", "❌"]:
+        return await cancel(update, context)
+    context.user_data['reason'] = text
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
+    await update.message.reply_text("Send photo\nНадішліть фото:", reply_markup=keyboard)
+    return PHOTO
+
+# =================== PHOTO ===================
+async def handle_photo(update, context):
+    idx = context.user_data['current_q']
+    reason = context.user_data.pop('reason', '')
+    call_sign = context.user_data.get('call_sign', 'UNKNOWN')
+    folder_path = os.path.join("Result", call_sign)
+    os.makedirs(folder_path, exist_ok=True)
+
+    if update.message.photo:
+        photo_file = await update.message.photo[-1].get_file()
+        filename = f"photo_{update.effective_user.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+        filepath = os.path.join(folder_path, filename)
+        await photo_file.download_to_drive(filepath)
+        full_remark = f"{reason}. Фото: {filename}" if reason else f"Фото: {filename}"
+    else:
+        full_remark = reason
+
+    context.user_data['answers'][idx] = {'no': True, 'remark': full_remark}
+    context.user_data['current_q'] += 1
+
+    if context.user_data['current_q'] >= len(MONTHLY_QUESTIONS):
+        return await finish_form(update, context)
+    await ask_question(update, context)
+    return QUESTION
+
+# =================== FINISH ===================
+import asyncio
+from telegram import InputFile
+
+async def finish_form(update, context):
+    call_sign = context.user_data.get('call_sign', 'UNKNOWN')
+    folder_path = os.path.join("Result", call_sign)
+    os.makedirs(folder_path, exist_ok=True)
+    final_name = f"193-VMR-{datetime.now().strftime('%y-%b').upper()} {call_sign}"
+    excel_filename = f"{final_name}.xlsx"
+    file_path = save_all_to_excel(context.user_data, folder_path, excel_filename)
+
+    location = context.user_data.get('location')
+    manager_ids = MANAGERS.get(location, [])
+
+    # Отправляем отчёт менеджерам
+    for manager_id in manager_ids:
+        with open(file_path, "rb") as f:
+            await context.bot.send_document(chat_id=manager_id, document=f, filename=excel_filename)
+        await context.bot.send_message(chat_id=manager_id, text=f"📄 New report for location {location}")
+
+    context.user_data.clear()
+
+    # безопасно получаем объект сообщения
+    msg = update.message or (update.callback_query and update.callback_query.message)
+    if msg:
+        # Отправка текста об успешной отправке
+        await msg.reply_text("✅ Report sent successfully!")
+
+        # короткая задержка перед стартовым меню
+        await asyncio.sleep(2)
+
+        # Отправка стартового меню с логотипом
+        logo_bytes_start = get_logo_bytes()  # функция должна возвращать BytesIO
+        logo_file = InputFile(logo_bytes_start, filename="logo.png")
+        keyboard = [[InlineKeyboardButton("Start | Почати", callback_data="main_menu")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await msg.reply_photo(photo=logo_file, caption="Welcome to NPA Fleet bot 🚗", reply_markup=reply_markup)
+
+    return ConversationHandler.END
+
+
+
+# =================== CANCEL ===================
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data.clear()
+    if update.callback_query:
+        await update.callback_query.answer()
+        try: await update.callback_query.message.delete()
+        except: pass
+    await main_menu(update, context)
+    return ConversationHandler.END
+
+# =================== HANDLER ===================
+inspection_handler = ConversationHandler(
+    entry_points=[CallbackQueryHandler(start_inspection, pattern="^monthly_form$")],
+    states={
+        SELECT_LOCATION: [CallbackQueryHandler(location_choice)],
+        SELECT_BRAND: [CallbackQueryHandler(brand_selected)],
+        REGISTRATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, registration_input)],
+        CALLSIGN: [MessageHandler(filters.TEXT & ~filters.COMMAND, call_sign_input)],
+        ODOMETER: [MessageHandler(filters.TEXT & ~filters.COMMAND, odometer_input)],
+        USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, user_input)],
+        QUESTION: [CallbackQueryHandler(handle_question)],
+        REASON: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_reason)],
+        PHOTO: [MessageHandler(filters.PHOTO | (filters.TEXT & ~filters.COMMAND), handle_photo)],
+    },
+    fallbacks=[CallbackQueryHandler(cancel, pattern="^cancel$")]
+)
+
+
+#=============================================================END Monthly inspection form=============================================================
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1249,7 +1603,7 @@ async def contacts_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("Shyroke | Широке", callback_data="contact_shyroke"),
             InlineKeyboardButton("Mykolaiv | Миколаїв", callback_data="contact_mykolaiv"),
         ],
-        [InlineKeyboardButton("❌ Back | Назад", callback_data="back")]
+        [InlineKeyboardButton("⬅️ Back | Назад", callback_data="back")]
     ]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1284,7 +1638,7 @@ async def contact_location_callback(update: Update, context: ContextTypes.DEFAUL
         keyboard = [
             [InlineKeyboardButton("Car Wash | Мийка", url="https://goo.gl/maps/carwash_shyroke")],
             [InlineKeyboardButton("Tire Service | Шиномонтаж", url="https://goo.gl/maps/tire_shyroke")],
-            [InlineKeyboardButton("❌ Back | Назад", callback_data="contacts")]
+            [InlineKeyboardButton("⬅️ Back | Назад", callback_data="contacts")]
         ]
     elif data == "contact_mykolaiv":
         text = (
@@ -1296,7 +1650,7 @@ async def contact_location_callback(update: Update, context: ContextTypes.DEFAUL
         keyboard = [
             [InlineKeyboardButton("Car Wash | Мийка", url="https://goo.gl/maps/carwash_mykolaiv")],
             [InlineKeyboardButton("Tire Service | Шиномонтаж", url="https://goo.gl/maps/tire_mykolaiv")],
-            [InlineKeyboardButton("❌ Back | Назад", callback_data="contacts")]
+            [InlineKeyboardButton("⬅️ Back | Назад", callback_data="contacts")]
         ]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1389,20 +1743,20 @@ async def contact_location_callback(update: Update, context: ContextTypes.DEFAUL
         keyboard = [
             [InlineKeyboardButton("🧼 Car Wash | Мийка", callback_data=f"{loc_key}_carwash")],
             [InlineKeyboardButton("🔧 Tire Service | Шиномонтаж", callback_data=f"{loc_key}_tire")],
-            [InlineKeyboardButton("❌ Back | Назад", callback_data="contacts")]
+            [InlineKeyboardButton("⬅️ Back | Назад", callback_data="contacts")]
         ]
     elif data.endswith("_carwash"):
         loc_key = data.split("_")[0]
         text = "🧼 Car Washes | Мийки:\n\n"
         for wash in LOCATIONS[loc_key]["car_washes"]:
             text += f"{wash['name']}\nPhone: {wash['phone']}\nMap: {wash['map']}\n\n"
-        keyboard = [[InlineKeyboardButton("❌ Back | Назад", callback_data=f"contact_{loc_key}")]]
+        keyboard = [[InlineKeyboardButton("⬅️ Back | Назад", callback_data=f"contact_{loc_key}")]]
     elif data.endswith("_tire"):
         loc_key = data.split("_")[0]
         text = "🔧 Tire Services | Шиномонтажі:\n\n"
         for tire in LOCATIONS[loc_key]["tire_services"]:
             text += f"{tire['name']}\nPhone: {tire['phone']}\nMap: {tire['map']}\n\n"
-        keyboard = [[InlineKeyboardButton("❌ Back | Назад", callback_data=f"contact_{loc_key}")]]
+        keyboard = [[InlineKeyboardButton("⬅️ Back | Назад", callback_data=f"contact_{loc_key}")]]
     else:
         return
 
@@ -1493,8 +1847,13 @@ def main():
     app.add_handler(CallbackQueryHandler(mfr_callback, pattern="mfr"))
     app.add_handler(CallbackQueryHandler(contacts_callback, pattern="contacts"))
     
-
     
+    app.add_handler(inspection_handler)
+       # Ввод данных автомобиля
+    
+    app.add_handler(CallbackQueryHandler(main_menu, pattern="^(ldr|mfr|contacts|accident_procedure|monthly_form)$"))
+
+
 
     # Команды администратора
     app.add_handler(CommandHandler("add_user", add_user))
