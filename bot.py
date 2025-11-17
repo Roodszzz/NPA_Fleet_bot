@@ -1821,37 +1821,91 @@ def main():
 
     
     # Handlers
+    # app.add_handler(mfr_conv)
+    # # app.add_handler(other_questions_conv)
+    # app.add_handler(ldr_conv)
+    # app.add_handler(CommandHandler("start", start))
+    # app.add_handler(CallbackQueryHandler(start_button_callback, pattern="main_menu"))
+    # app.add_handler(CallbackQueryHandler(ldr_callback, pattern="ldr"))
+    # app.add_handler(CallbackQueryHandler(mfr_callback, pattern="mfr"))
+    # app.add_handler(CallbackQueryHandler(contacts_callback, pattern="contacts"))
+    # app.add_handler(CallbackQueryHandler(main_menu, pattern="^(ldr|mfr|accident_procedure|contacts|monthly_form)$"))
+    
+    # app.add_handler(inspection_handler)
+    #    # Ввод данных автомобиля
+    
+    
+
+
+
+    # # Команды администратора
+    # app.add_handler(CommandHandler("add_user", add_user))
+    # app.add_handler(CommandHandler("remove_user", remove_user))
+    # app.add_handler(CommandHandler("list_users", list_users))
+
+
+    # # Accident procedures (ДТП)
+    # app.add_handler(CallbackQueryHandler(accident_procedure_callback, pattern="^accident_procedure$"))
+    # app.add_handler(CallbackQueryHandler(accident_procedure_ua_callback, pattern="^accident_procedure_ua$"))
+    # app.add_handler(CallbackQueryHandler(accident_procedure_en_callback, pattern="^accident_procedure_en$"))
+
+    # app.add_handler(CallbackQueryHandler(cancel, pattern="cancel"))
+    # app.add_handler(CallbackQueryHandler(contacts_callback, pattern="^contacts$"))
+    # app.add_handler(CallbackQueryHandler(contact_location_callback, pattern="^contact_shyroke$|^contact_mykolaiv$|^shyroke_carwash$|^shyroke_tire$|^mykolaiv_carwash$|^mykolaiv_tire$|^back$"))
+
+
+
+
+
+    # ======================== HANDLERS ========================
+
+# ======================== HANDLERS ========================
+
+    # Conversation handlers / form handlers
     app.add_handler(mfr_conv)
-    # app.add_handler(other_questions_conv)
     app.add_handler(ldr_conv)
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(start_button_callback, pattern="main_menu"))
-    app.add_handler(CallbackQueryHandler(ldr_callback, pattern="ldr"))
-    app.add_handler(CallbackQueryHandler(mfr_callback, pattern="mfr"))
-    app.add_handler(CallbackQueryHandler(contacts_callback, pattern="contacts"))
-    
-    
     app.add_handler(inspection_handler)
-       # Ввод данных автомобиля
-    
-    app.add_handler(CallbackQueryHandler(main_menu, pattern="^(ldr|mfr|contacts|accident_procedure|monthly_form)$"))
+    # app.add_handler(other_questions_conv)
 
-
-
-    # Команды администратора
+    # Команды
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("add_user", add_user))
     app.add_handler(CommandHandler("remove_user", remove_user))
     app.add_handler(CommandHandler("list_users", list_users))
 
+    # Главная кнопка (main menu)
+    app.add_handler(CallbackQueryHandler(start_button_callback, pattern="^main_menu$"))
 
-    # Accident procedures (ДТП)
+    # LDR / MFR
+    app.add_handler(CallbackQueryHandler(ldr_callback, pattern="^ldr$"))
+    app.add_handler(CallbackQueryHandler(mfr_callback, pattern="^mfr$"))
+
+    # Contacts (главное и локации)
+    app.add_handler(CallbackQueryHandler(contacts_callback, pattern="^contacts$"))
+    app.add_handler(
+        CallbackQueryHandler(
+            contact_location_callback,
+            pattern="^(contact_shyroke|contact_mykolaiv|shyroke_carwash|shyroke_tire|mykolaiv_carwash|mykolaiv_tire|back)$"
+        )
+    )
+
+    # Accident procedure (ДТП)
     app.add_handler(CallbackQueryHandler(accident_procedure_callback, pattern="^accident_procedure$"))
     app.add_handler(CallbackQueryHandler(accident_procedure_ua_callback, pattern="^accident_procedure_ua$"))
     app.add_handler(CallbackQueryHandler(accident_procedure_en_callback, pattern="^accident_procedure_en$"))
 
-    app.add_handler(CallbackQueryHandler(cancel, pattern="cancel"))
-    app.add_handler(CallbackQueryHandler(contacts_callback, pattern="^contacts$"))
-    app.add_handler(CallbackQueryHandler(contact_location_callback, pattern="^contact_shyroke$|^contact_mykolaiv$|^shyroke_carwash$|^shyroke_tire$|^mykolaiv_carwash$|^mykolaiv_tire$|^back$"))
+    # Cancel
+    app.add_handler(CallbackQueryHandler(cancel, pattern="^cancel$"))
+
+
+
+
+
+
+
+
+
+
 
 
     app.run_polling()
