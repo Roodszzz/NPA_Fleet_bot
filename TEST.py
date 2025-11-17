@@ -1265,43 +1265,58 @@ def set_cell(ws, cell, value):
                 ws.cell(row=merged_range.min_row, column=merged_range.min_col, value=value)
                 break
 
+
+
 import xlwings as xw
-from datetime import datetime
+import shutil
 import os
+from datetime import datetime
 
 def save_all_to_excel(user_data, folder_path, excel_filename):
     """
-    Сохраняет данные пользователя в Excel-шаблон, полностью сохраняя шрифты и оформление.
-    Использует xlwings, чтобы работать через Excel напрямую.
+    Сохраняет данные пользователя в Excel-шаблон через xlwings,
+    полностью сохраняя шрифты, стили и объединенные ячейки.
     """
     file_path = os.path.join(folder_path, excel_filename)
     os.makedirs(folder_path, exist_ok=True)
 
-    # Открываем шаблон
-    wb = xw.Book(os.path.join("excel", "MIF.xlsx"))
-    ws = wb.sheets[0]
+    # 1️⃣ Копируем шаблон
+    template_path = os.path.join("excel", "MIF.xlsx")
+    shutil.copyfile(template_path, file_path)
 
-    # Заполняем общие данные
-    ws.range("A4").value = datetime.now().strftime("%Y-%m-%d")
-    ws.range("B4").value = user_data.get("brand", "")
-    ws.range("C4").value = user_data.get("registration_number", "")
-    ws.range("E4").value = user_data.get("call_sign", "")
-    ws.range("G4").value = user_data.get("odometer", "")
-    ws.range("H4").value = user_data.get("driver_name", "")
+    # 2️⃣ Запускаем Excel в фоновом режиме
+    app = xw.App(visible=False)
+    try:
+        wb = xw.Book(file_path)
+        ws = wb.sheets[0]
 
-    # Заполняем ответы на вопросы
-    for idx, q_data in enumerate(MONTHLY_QUESTIONS):
-        ans = user_data['answers'].get(idx, {})
-        if ans.get('yes'):
-            ws.range(q_data['yes_cell']).value = "+"
-        if ans.get('no'):
-            ws.range(q_data['no_cell']).value = "-"
-            ws.range(q_data['remark_cell']).value = ans.get('remark', '')
+        # ======= Общие данные =======
+        ws.range("A4").value = datetime.now().strftime("%Y-%m-%d")
+        ws.range("B4").value = user_data.get("brand", "")
+        ws.range("C4").value = user_data.get("registration_number", "")
+        ws.range("E4").value = user_data.get("call_sign", "")
+        ws.range("G4").value = user_data.get("odometer", "")
+        ws.range("H4").value = user_data.get("driver_name", "")
 
-    # Сохраняем результат
-    wb.save(file_path)
-    wb.close()
+        # ======= Вопросы =======
+        for idx, q_data in enumerate(MONTHLY_QUESTIONS):
+            ans = user_data['answers'].get(idx, {})
+            if ans.get('yes'):
+                ws.range(q_data['yes_cell']).value = "+"  # сохраняем только значение
+            if ans.get('no'):
+                ws.range(q_data['no_cell']).value = "-"
+                ws.range(q_data['remark_cell']).value = ans.get('remark', '')
+
+        # Сохраняем и закрываем
+        wb.save()
+        wb.close()
+    finally:
+        app.quit()
+
     return file_path
+
+
+
 
 
 # =================== START ===================

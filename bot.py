@@ -1227,7 +1227,6 @@ async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TY
 
 import os
 import re
-import xlwings as xw
 import shutil
 import asyncio
 from telegram import InputFile
@@ -1239,6 +1238,9 @@ from telegram.ext import (
     filters, ContextTypes
 )
 from monthly_questions import MONTHLY_QUESTIONS
+import json
+import xlwings as xw
+
 # =================== Константы ===================
 ADMIN_ID = 507775858
 EXCEL_TEMPLATE = os.path.join("excel", "MIF.xlsx")
@@ -1246,7 +1248,7 @@ RESULT_FOLDER = "Result"
 os.makedirs(RESULT_FOLDER, exist_ok=True)
 
 # =================== FSM состояния ===================
-(SELECT_LOCATION, SELECT_BRAND, REGISTRATION, CALLSIGN, ODOMETER, USER, QUESTION, REASON, PHOTO) = range(9)
+(SELECT_LOCATION, SELECT_BRAND, CALLSIGN, ODOMETER, USER, QUESTION, REASON, PHOTO) = range(8)
 
 # =================== Менеджеры ===================
 MANAGERS = {
@@ -1259,6 +1261,10 @@ MANAGERS = {
 # =================== Вопросы ===================
 MONTHLY_QUESTIONS = MONTHLY_QUESTIONS
 
+# =================== Call sign → Registration ===================
+with open("cars.json", "r", encoding="utf-8") as f:
+    CARS = json.load(f)
+
 # =================== Функции для Excel ===================
 def set_cell(ws, cell, value):
     try:
@@ -1269,31 +1275,25 @@ def set_cell(ws, cell, value):
                 ws.cell(row=merged_range.min_row, column=merged_range.min_col, value=value)
                 break
 
-
-
-
-
-
 def save_all_to_excel(user_data, folder_path, excel_filename):
     """
-    Сохраняет данные пользователя в Excel-шаблон,
-    полностью сохраняя шрифты и оформление,
-    при этом Excel не появляется на экране.
+    Сохраняет данные пользователя в Excel-шаблон через xlwings,
+    полностью сохраняя шрифты, стили и объединенные ячейки.
     """
     file_path = os.path.join(folder_path, excel_filename)
     os.makedirs(folder_path, exist_ok=True)
 
-    # 1️⃣ копируем шаблон
+    # 1️⃣ Копируем шаблон
     template_path = os.path.join("excel", "MIF.xlsx")
     shutil.copyfile(template_path, file_path)
 
-    # 2️⃣ запускаем Excel в тихом режиме
+    # 2️⃣ Запускаем Excel в фоновом режиме
     app = xw.App(visible=False)
     try:
         wb = xw.Book(file_path)
         ws = wb.sheets[0]
 
-        # Заполняем общие данные
+        # ======= Общие данные =======
         ws.range("A4").value = datetime.now().strftime("%Y-%m-%d")
         ws.range("B4").value = user_data.get("brand", "")
         ws.range("C4").value = user_data.get("registration_number", "")
@@ -1301,25 +1301,22 @@ def save_all_to_excel(user_data, folder_path, excel_filename):
         ws.range("G4").value = user_data.get("odometer", "")
         ws.range("H4").value = user_data.get("driver_name", "")
 
-        # Заполняем ответы на вопросы
+        # ======= Вопросы =======
         for idx, q_data in enumerate(MONTHLY_QUESTIONS):
             ans = user_data['answers'].get(idx, {})
             if ans.get('yes'):
-                ws.range(q_data['yes_cell']).value = "+"
+                ws.range(q_data['yes_cell']).value = "+"  # сохраняем только значение
             if ans.get('no'):
                 ws.range(q_data['no_cell']).value = "-"
                 ws.range(q_data['remark_cell']).value = ans.get('remark', '')
 
-        # Сохраняем и закрываем книгу
+        # Сохраняем и закрываем
         wb.save()
         wb.close()
     finally:
         app.quit()
 
     return file_path
-
-
-
 
 # =================== START ===================
 async def start_inspection(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1362,30 +1359,9 @@ async def brand_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['brand'] = query.data.replace("brand_", "")
     keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
     await query.message.reply_text(
-        "Enter registration number (AA 9999 AA)\nВведіть реєстраційний номер авто:",
-        reply_markup=keyboard
+        "Enter call sign (HP-01)\nВведіть внутрішній номер авто:", reply_markup=keyboard
     )
-    return REGISTRATION
-
-
-# =================== REGISTRATION ===================
-async def registration_input(update, context):
-    text = update.message.text.strip().upper()
-    if text.lower() in ["cancel", "відмінити", "❌"]:
-        return await cancel(update, context)
-    # удаляем все, кроме букв и цифр
-    text_clean = re.sub(r"[^A-Z0-9]", "", text)
-    if len(text_clean) != 8:
-        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
-        await update.message.reply_text("❌ Неправильний формат. Має бути FF 9999 FF", reply_markup=keyboard)
-        return REGISTRATION
-    # форматируем
-    text_formatted = f"{text_clean[:2]} {text_clean[2:6]} {text_clean[6:]}"
-    context.user_data['registration_number'] = text_formatted
-    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
-    await update.message.reply_text("Enter call sign (HP-01)\nВведіть внутрішній номер авто:", reply_markup=keyboard)
     return CALLSIGN
-
 
 # =================== CALLSIGN ===================
 async def call_sign_input(update, context):
@@ -1393,20 +1369,27 @@ async def call_sign_input(update, context):
     if text.lower() in ["cancel", "відмінити", "❌"]:
         return await cancel(update, context)
 
-    # Проверка и автоподгонка формата AA-00
     match = re.fullmatch(r"([A-Z]{2})-?(\d{2})", text)
     if not match:
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
         await update.message.reply_text("❌ Формат повинен бути HP-01", reply_markup=keyboard)
         return CALLSIGN
 
-    # Форматируем как AA-00
     formatted_call_sign = f"{match[1]}-{match[2]}"
-    context.user_data['call_sign'] = formatted_call_sign
-    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
-    await update.message.reply_text("Enter odometer reading (km)\nВведіть пробіг авто:", reply_markup=keyboard)
-    return ODOMETER
+    registration_number = CARS.get(formatted_call_sign)
+    if not registration_number:
+        await update.message.reply_text(f"❌ Call sign {formatted_call_sign} не знайдено в базі.")
+        return CALLSIGN
 
+    context.user_data['call_sign'] = formatted_call_sign
+    context.user_data['registration_number'] = registration_number
+
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
+    await update.message.reply_text(
+        f"Call sign: {formatted_call_sign}\nРег. номер авто: {registration_number}\n\nEnter odometer reading (km)\nВведіть пробіг авто:",
+        reply_markup=keyboard
+    )
+    return ODOMETER
 
 # =================== ODOMETER ===================
 async def odometer_input(update, context):
@@ -1481,98 +1464,57 @@ async def handle_photo(update, context):
 
     location = context.user_data.get('location', 'UNKNOWN')
     call_sign = context.user_data.get('call_sign', 'UNKNOWN')
-
-    # Папка: Result / Location / CallSign /
     folder_path = os.path.join("Result", location, call_sign)
     os.makedirs(folder_path, exist_ok=True)
 
-    # Если фото есть
     if update.message.photo:
         photo_file = await update.message.photo[-1].get_file()
         filename = f"photo_{update.effective_user.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
         filepath = os.path.join(folder_path, filename)
         await photo_file.download_to_drive(filepath)
-
         full_remark = f"{reason}. Фото: {filename}" if reason else f"Фото: {filename}"
     else:
         full_remark = reason
 
-    # Сохраняем ответ
     context.user_data['answers'][idx] = {'no': True, 'remark': full_remark}
     context.user_data['current_q'] += 1
 
-    # Проверка финала
     if context.user_data['current_q'] >= len(MONTHLY_QUESTIONS):
         return await finish_form(update, context)
-
-    # Следующий вопрос
     await ask_question(update, context)
     return QUESTION
 
-
 # =================== FINISH ===================
-
-
 async def finish_form(update, context):
     location = context.user_data.get('location', 'UNKNOWN')
     call_sign = context.user_data.get('call_sign', 'UNKNOWN')
-
-    # Папка: Result / Location / CallSign /
     folder_path = os.path.join("Result", location, call_sign)
     os.makedirs(folder_path, exist_ok=True)
 
-    # Имя финального файла
     final_name = f"193-VMR-{datetime.now().strftime('%y-%b').upper()} {call_sign}"
     excel_filename = f"{final_name}.xlsx"
 
-    # Сохраняем Excel
     file_path = save_all_to_excel(context.user_data, folder_path, excel_filename)
-
-    # Получаем менеджеров по локации
     manager_ids = MANAGERS.get(location, [])
 
-    # Отправляем отчёт менеджерам
     for manager_id in manager_ids:
         with open(file_path, "rb") as f:
             await context.bot.send_document(chat_id=manager_id, document=f, filename=excel_filename)
         await context.bot.send_message(chat_id=manager_id, text=f"📄 New report VMR for location {location}")
 
-    # Очищаем данные
     context.user_data.clear()
-
-    # --------------------------------------------------
-    # Возврат к стартовому меню
-    # --------------------------------------------------
-
     msg = update.message or (update.callback_query and update.callback_query.message)
 
     if msg:
-        # сообщение об успешной отправке
         await msg.reply_text("✅ Report sent successfully!")
-
-        # пауза перед стартом
         await asyncio.sleep(2)
-
-        # логотип
-        logo_bytes_start = get_logo_bytes()  # возвращает BytesIO
+        logo_bytes_start = get_logo_bytes()
         logo_file = InputFile(logo_bytes_start, filename="logo.png")
-
-        # кнопка Start
         keyboard = [[InlineKeyboardButton("Start | Почати", callback_data="main_menu")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-
-        # отправка логотипа + стартового меню
-        await msg.reply_photo(
-            photo=logo_file,
-            caption="Welcome to NPA Fleet bot 🚗",
-            reply_markup=reply_markup
-        )
+        await msg.reply_photo(photo=logo_file, caption="Welcome to NPA Fleet bot 🚗", reply_markup=reply_markup)
 
     return ConversationHandler.END
-
-
-
-
 
 # =================== CANCEL ===================
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1590,7 +1532,6 @@ inspection_handler = ConversationHandler(
     states={
         SELECT_LOCATION: [CallbackQueryHandler(location_choice)],
         SELECT_BRAND: [CallbackQueryHandler(brand_selected)],
-        REGISTRATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, registration_input)],
         CALLSIGN: [MessageHandler(filters.TEXT & ~filters.COMMAND, call_sign_input)],
         ODOMETER: [MessageHandler(filters.TEXT & ~filters.COMMAND, odometer_input)],
         USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, user_input)],
@@ -1603,23 +1544,6 @@ inspection_handler = ConversationHandler(
 
 
 #=============================================================END Monthly inspection form=============================================================
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
