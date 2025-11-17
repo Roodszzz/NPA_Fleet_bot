@@ -1524,7 +1524,7 @@ async def handle_photo(update, context):
         filename = f"photo_{update.effective_user.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
         filepath = os.path.join(folder_path, filename)
         await photo_file.download_to_drive(filepath)
-        full_remark = f"{reason}. Фото: {filename}" if reason else f"Фото: {filename}"
+        full_remark = f"{reason}. \nФото: {filename}" if reason else f"Фото: {filename}"
     else:
         full_remark = reason
 
