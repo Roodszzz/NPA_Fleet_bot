@@ -1227,6 +1227,10 @@ async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TY
 
 import os
 import re
+import xlwings as xw
+import shutil
+import asyncio
+from telegram import InputFile
 from datetime import datetime
 from openpyxl import load_workbook
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -1265,43 +1269,56 @@ def set_cell(ws, cell, value):
                 ws.cell(row=merged_range.min_row, column=merged_range.min_col, value=value)
                 break
 
-import xlwings as xw
-from datetime import datetime
-import os
+
+
+
+
 
 def save_all_to_excel(user_data, folder_path, excel_filename):
     """
-    Сохраняет данные пользователя в Excel-шаблон, полностью сохраняя шрифты и оформление.
-    Использует xlwings, чтобы работать через Excel напрямую.
+    Сохраняет данные пользователя в Excel-шаблон,
+    полностью сохраняя шрифты и оформление,
+    при этом Excel не появляется на экране.
     """
     file_path = os.path.join(folder_path, excel_filename)
     os.makedirs(folder_path, exist_ok=True)
 
-    # Открываем шаблон
-    wb = xw.Book(os.path.join("excel", "MIF.xlsx"))
-    ws = wb.sheets[0]
+    # 1️⃣ копируем шаблон
+    template_path = os.path.join("excel", "MIF.xlsx")
+    shutil.copyfile(template_path, file_path)
 
-    # Заполняем общие данные
-    ws.range("A4").value = datetime.now().strftime("%Y-%m-%d")
-    ws.range("B4").value = user_data.get("brand", "")
-    ws.range("C4").value = user_data.get("registration_number", "")
-    ws.range("E4").value = user_data.get("call_sign", "")
-    ws.range("G4").value = user_data.get("odometer", "")
-    ws.range("H4").value = user_data.get("driver_name", "")
+    # 2️⃣ запускаем Excel в тихом режиме
+    app = xw.App(visible=False)
+    try:
+        wb = xw.Book(file_path)
+        ws = wb.sheets[0]
 
-    # Заполняем ответы на вопросы
-    for idx, q_data in enumerate(MONTHLY_QUESTIONS):
-        ans = user_data['answers'].get(idx, {})
-        if ans.get('yes'):
-            ws.range(q_data['yes_cell']).value = "+"
-        if ans.get('no'):
-            ws.range(q_data['no_cell']).value = "-"
-            ws.range(q_data['remark_cell']).value = ans.get('remark', '')
+        # Заполняем общие данные
+        ws.range("A4").value = datetime.now().strftime("%Y-%m-%d")
+        ws.range("B4").value = user_data.get("brand", "")
+        ws.range("C4").value = user_data.get("registration_number", "")
+        ws.range("E4").value = user_data.get("call_sign", "")
+        ws.range("G4").value = user_data.get("odometer", "")
+        ws.range("H4").value = user_data.get("driver_name", "")
 
-    # Сохраняем результат
-    wb.save(file_path)
-    wb.close()
+        # Заполняем ответы на вопросы
+        for idx, q_data in enumerate(MONTHLY_QUESTIONS):
+            ans = user_data['answers'].get(idx, {})
+            if ans.get('yes'):
+                ws.range(q_data['yes_cell']).value = "+"
+            if ans.get('no'):
+                ws.range(q_data['no_cell']).value = "-"
+                ws.range(q_data['remark_cell']).value = ans.get('remark', '')
+
+        # Сохраняем и закрываем книгу
+        wb.save()
+        wb.close()
+    finally:
+        app.quit()
+
     return file_path
+
+
 
 
 # =================== START ===================
@@ -1461,67 +1478,99 @@ async def handle_reason(update, context):
 async def handle_photo(update, context):
     idx = context.user_data['current_q']
     reason = context.user_data.pop('reason', '')
+
+    location = context.user_data.get('location', 'UNKNOWN')
     call_sign = context.user_data.get('call_sign', 'UNKNOWN')
-    folder_path = os.path.join("Result", call_sign)
+
+    # Папка: Result / Location / CallSign /
+    folder_path = os.path.join("Result", location, call_sign)
     os.makedirs(folder_path, exist_ok=True)
 
+    # Если фото есть
     if update.message.photo:
         photo_file = await update.message.photo[-1].get_file()
         filename = f"photo_{update.effective_user.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
         filepath = os.path.join(folder_path, filename)
         await photo_file.download_to_drive(filepath)
+
         full_remark = f"{reason}. Фото: {filename}" if reason else f"Фото: {filename}"
     else:
         full_remark = reason
 
+    # Сохраняем ответ
     context.user_data['answers'][idx] = {'no': True, 'remark': full_remark}
     context.user_data['current_q'] += 1
 
+    # Проверка финала
     if context.user_data['current_q'] >= len(MONTHLY_QUESTIONS):
         return await finish_form(update, context)
+
+    # Следующий вопрос
     await ask_question(update, context)
     return QUESTION
 
+
 # =================== FINISH ===================
-import asyncio
-from telegram import InputFile
+
 
 async def finish_form(update, context):
+    location = context.user_data.get('location', 'UNKNOWN')
     call_sign = context.user_data.get('call_sign', 'UNKNOWN')
-    folder_path = os.path.join("Result", call_sign)
+
+    # Папка: Result / Location / CallSign /
+    folder_path = os.path.join("Result", location, call_sign)
     os.makedirs(folder_path, exist_ok=True)
+
+    # Имя финального файла
     final_name = f"193-VMR-{datetime.now().strftime('%y-%b').upper()} {call_sign}"
     excel_filename = f"{final_name}.xlsx"
+
+    # Сохраняем Excel
     file_path = save_all_to_excel(context.user_data, folder_path, excel_filename)
 
-    location = context.user_data.get('location')
+    # Получаем менеджеров по локации
     manager_ids = MANAGERS.get(location, [])
 
     # Отправляем отчёт менеджерам
     for manager_id in manager_ids:
         with open(file_path, "rb") as f:
             await context.bot.send_document(chat_id=manager_id, document=f, filename=excel_filename)
-        await context.bot.send_message(chat_id=manager_id, text=f"📄 New report for location {location}")
+        await context.bot.send_message(chat_id=manager_id, text=f"📄 New report VMR for location {location}")
 
+    # Очищаем данные
     context.user_data.clear()
 
-    # безопасно получаем объект сообщения
+    # --------------------------------------------------
+    # Возврат к стартовому меню
+    # --------------------------------------------------
+
     msg = update.message or (update.callback_query and update.callback_query.message)
+
     if msg:
-        # Отправка текста об успешной отправке
+        # сообщение об успешной отправке
         await msg.reply_text("✅ Report sent successfully!")
 
-        # короткая задержка перед стартовым меню
+        # пауза перед стартом
         await asyncio.sleep(2)
 
-        # Отправка стартового меню с логотипом
-        logo_bytes_start = get_logo_bytes()  # функция должна возвращать BytesIO
+        # логотип
+        logo_bytes_start = get_logo_bytes()  # возвращает BytesIO
         logo_file = InputFile(logo_bytes_start, filename="logo.png")
+
+        # кнопка Start
         keyboard = [[InlineKeyboardButton("Start | Почати", callback_data="main_menu")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await msg.reply_photo(photo=logo_file, caption="Welcome to NPA Fleet bot 🚗", reply_markup=reply_markup)
+
+        # отправка логотипа + стартового меню
+        await msg.reply_photo(
+            photo=logo_file,
+            caption="Welcome to NPA Fleet bot 🚗",
+            reply_markup=reply_markup
+        )
 
     return ConversationHandler.END
+
+
 
 
 
