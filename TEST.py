@@ -1275,23 +1275,22 @@ with open("asset_num.json", "r", encoding="utf-8") as f:
 
 
 
-#=============================================================Monthly inspection form=============================================================
 
+#=============================================================Monthly inspection form=============================================================
 import os
 import re
 import shutil
 import asyncio
-from telegram import InputFile
+import json
 from datetime import datetime
-from openpyxl import load_workbook
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from PIL import Image
+import xlwings as xw
+from telegram import InputFile, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ConversationHandler, MessageHandler, CallbackQueryHandler,
     filters, ContextTypes
 )
 from monthly_questions import MONTHLY_QUESTIONS
-import json
-import xlwings as xw
 
 # =================== Константы ===================
 ADMIN_ID = 507775858
@@ -1300,7 +1299,10 @@ RESULT_FOLDER = "Result"
 os.makedirs(RESULT_FOLDER, exist_ok=True)
 
 # =================== FSM состояния ===================
-(SELECT_LOCATION, SELECT_BRAND, CALLSIGN, ODOMETER, USER, QUESTION, REASON, PHOTO) = range(8)
+(
+    SELECT_LOCATION, SELECT_BRAND, CALLSIGN, ODOMETER,
+    USER, QUESTION, REASON, PHOTO, SIGNATURE
+) = range(9)
 
 # =================== Менеджеры ===================
 MANAGERS = {
@@ -1309,9 +1311,6 @@ MANAGERS = {
     "Kyiv": [ADMIN_ID],
     "Sumy/Romny": [ADMIN_ID]
 }
-
-# =================== Вопросы ===================
-MONTHLY_QUESTIONS = MONTHLY_QUESTIONS
 
 # =================== Call sign → Registration ===================
 with open("cars.json", "r", encoding="utf-8") as f:
@@ -1328,18 +1327,10 @@ def set_cell(ws, cell, value):
                 break
 
 def save_all_to_excel(user_data, folder_path, excel_filename):
-    """
-    Сохраняет данные пользователя в Excel-шаблон через xlwings,
-    полностью сохраняя шрифты, стили и объединенные ячейки.
-    """
-    file_path = os.path.join(folder_path, excel_filename)
     os.makedirs(folder_path, exist_ok=True)
+    file_path = os.path.join(folder_path, excel_filename)
+    shutil.copyfile(EXCEL_TEMPLATE, file_path)
 
-    # 1️⃣ Копируем шаблон
-    template_path = os.path.join("excel", "MIF.xlsx")
-    shutil.copyfile(template_path, file_path)
-
-    # 2️⃣ Запускаем Excel в фоновом режиме
     app = xw.App(visible=False)
     try:
         wb = xw.Book(file_path)
@@ -1357,12 +1348,27 @@ def save_all_to_excel(user_data, folder_path, excel_filename):
         for idx, q_data in enumerate(MONTHLY_QUESTIONS):
             ans = user_data['answers'].get(idx, {})
             if ans.get('yes'):
-                ws.range(q_data['yes_cell']).value = "+"  # сохраняем только значение
+                ws.range(q_data['yes_cell']).value = "+"
             if ans.get('no'):
                 ws.range(q_data['no_cell']).value = "-"
                 ws.range(q_data['remark_cell']).value = ans.get('remark', '')
 
-        # Сохраняем и закрываем
+        # ======= Вставка подписи =======
+        signature_file = user_data.get('signature_file')
+        if signature_file and os.path.exists(signature_file):
+            signature_file = os.path.abspath(signature_file)
+            # удаляем старые картинки
+            for pic in ws.pictures:
+                if pic.top_left_cell.address == ws.range("F23").address:
+                    pic.delete()
+
+            pic_width = int(93 * 1.2)   # ширина в пикселях
+            pic_height = int(106 * 1.2) # высота в пикселях
+            cell = ws.range("F23")
+            left = cell.left + (cell.width - pic_width) / 2
+            top = cell.top + (cell.height - pic_height) / 2
+            ws.pictures.add(signature_file, left=left, top=top, width=pic_width, height=pic_height)
+
         wb.save()
         wb.close()
     finally:
@@ -1370,8 +1376,43 @@ def save_all_to_excel(user_data, folder_path, excel_filename):
 
     return file_path
 
+# =================== УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ОТВЕТА С УДАЛЕНИЕМ ПРЕДЫДУЩИХ СООБЩЕНИЙ ===================
+async def bot_reply(update, context, text, reply_markup=None):
+    # удаляем предыдущие сообщения бота
+    for msg_id in context.user_data.get('messages', []):
+        try:
+            await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=msg_id)
+        except:
+            pass
+    context.user_data['messages'] = []
+
+    # отправляем новое сообщение
+    msg = await (update.message or update.callback_query.message).reply_text(text, reply_markup=reply_markup)
+    context.user_data.setdefault('messages', []).append(msg.message_id)
+    return msg
+
+# =================== REMOVE BACKGROUND ===================
+def remove_bg(input_path, output_path):
+    img = Image.open(input_path).convert("RGBA")
+    datas = img.getdata()
+    new_data = []
+    for item in datas:
+        if item[0] > 240 and item[1] > 240 and item[2] > 240:
+            new_data.append((255, 255, 255, 0))
+        else:
+            new_data.append(item)
+    img.putdata(new_data)
+    img.save(output_path, "PNG")
+
 # =================== START ===================
 async def start_inspection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Если есть callback_query (нажатие кнопки), удаляем сообщение меню
+    if update.callback_query:
+        try:
+            await update.callback_query.message.delete()
+        except:
+            pass
+
     keyboard = [
         [InlineKeyboardButton("Shyroke", callback_data="loc_Shyroke")],
         [InlineKeyboardButton("Mykolaiv", callback_data="loc_Mykolaiv")],
@@ -1379,16 +1420,24 @@ async def start_inspection(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("Sumy/Romny", callback_data="loc_Sumy/Romny")],
         [InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]
     ]
-    msg = update.message or update.callback_query.message
-    await msg.reply_text("Select location\nОберіть локацію:", reply_markup=InlineKeyboardMarkup(keyboard))
+    await bot_reply(update, context, "Select location\nОберіть локацію:", reply_markup=InlineKeyboardMarkup(keyboard))
     return SELECT_LOCATION
+
 
 # =================== LOCATION SELECT ===================
 async def location_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+
+    # сразу удаляем сообщение меню
+    try:
+        await query.message.delete()
+    except:
+        pass
+
     if query.data == "cancel":
         return await cancel(update, context)
+
     context.user_data['location'] = query.data.replace("loc_", "")
     keyboard = [
         [InlineKeyboardButton("TOYOTA", callback_data="brand_TOYOTA")],
@@ -1399,8 +1448,9 @@ async def location_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("SKODA KODIAQ", callback_data="brand_SKODA KODIAQ")],
         [InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]
     ]
-    await query.message.reply_text("Select car brand\nОберіть марку авто:", reply_markup=InlineKeyboardMarkup(keyboard))
+    await bot_reply(update, context, "Select car brand\nОберіть марку авто:", reply_markup=InlineKeyboardMarkup(keyboard))
     return SELECT_BRAND
+
 
 # =================== BRAND SELECT ===================
 async def brand_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1408,11 +1458,10 @@ async def brand_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     if query.data == "cancel":
         return await cancel(update, context)
+
     context.user_data['brand'] = query.data.replace("brand_", "")
     keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
-    await query.message.reply_text(
-        "Enter call sign (HP-01)\nВведіть внутрішній номер авто:", reply_markup=keyboard
-    )
+    await bot_reply(update, context, "Enter call sign (HP-01)\nВведіть внутрішній номер авто:", reply_markup=keyboard)
     return CALLSIGN
 
 # =================== CALLSIGN ===================
@@ -1424,23 +1473,20 @@ async def call_sign_input(update, context):
     match = re.fullmatch(r"([A-Z]{2})-?(\d{2})", text)
     if not match:
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
-        await update.message.reply_text("❌ Формат повинен бути HP-01", reply_markup=keyboard)
+        await bot_reply(update, context, "❌ Формат повинен бути HP-01", reply_markup=keyboard)
         return CALLSIGN
 
     formatted_call_sign = f"{match[1]}-{match[2]}"
     registration_number = CARS.get(formatted_call_sign)
     if not registration_number:
-        await update.message.reply_text(f"❌ Call sign {formatted_call_sign} не знайдено в базі.")
+        await bot_reply(update, context, f"❌ Call sign {formatted_call_sign} не знайдено в базі.")
         return CALLSIGN
 
     context.user_data['call_sign'] = formatted_call_sign
     context.user_data['registration_number'] = registration_number
 
     keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
-    await update.message.reply_text(
-        f"Call sign: {formatted_call_sign}\nРег. номер авто: {registration_number}\n\nEnter odometer reading (km)\nВведіть пробіг авто:",
-        reply_markup=keyboard
-    )
+    await bot_reply(update, context, f"Call sign: {formatted_call_sign}\nРег. номер авто: {registration_number}\n\nEnter odometer reading (km)\nВведіть пробіг авто:", reply_markup=keyboard)
     return ODOMETER
 
 # =================== ODOMETER ===================
@@ -1450,11 +1496,12 @@ async def odometer_input(update, context):
         return await cancel(update, context)
     if not text.isdigit():
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
-        await update.message.reply_text("❌ Одометр повинен бути числом", reply_markup=keyboard)
+        await bot_reply(update, context, "❌ Одометр повинен бути числом", reply_markup=keyboard)
         return ODOMETER
+
     context.user_data['odometer'] = text
     keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
-    await update.message.reply_text("Enter your full name\nВведіть ваше ПІБ:", reply_markup=keyboard)
+    await bot_reply(update, context, "Enter your full name\nВведіть ваше ПІБ:", reply_markup=keyboard)
     return USER
 
 # =================== USER ===================
@@ -1462,41 +1509,40 @@ async def user_input(update, context):
     text = update.message.text.strip()
     if text.lower() in ["cancel", "відмінити", "❌"]:
         return await cancel(update, context)
+
     context.user_data['driver_name'] = text
     context.user_data['answers'] = {}
     context.user_data['current_q'] = 0
-    await ask_question(update, context)
-    return QUESTION
+    return await ask_question(update, context)
 
 # =================== QUESTIONS ===================
 async def ask_question(update, context):
     idx = context.user_data['current_q']
+    if idx >= len(MONTHLY_QUESTIONS):
+        return await ask_signature(update, context)
+
     q = MONTHLY_QUESTIONS[idx]['text']
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("Yes / Так", callback_data="yes")],
         [InlineKeyboardButton("No / Ні", callback_data="no")],
         [InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]
     ])
-    msg = update.message or update.callback_query.message
-    if update.callback_query:
-        await update.callback_query.answer()
-    await msg.reply_text(q, reply_markup=keyboard)
+    await bot_reply(update, context, q, reply_markup=keyboard)
+    return QUESTION
 
 async def handle_question(update, context):
     query = update.callback_query
     await query.answer()
     if query.data == "cancel":
         return await cancel(update, context)
+
     idx = context.user_data['current_q']
     if query.data == "yes":
         context.user_data['answers'][idx] = {'yes': True}
         context.user_data['current_q'] += 1
-        if context.user_data['current_q'] >= len(MONTHLY_QUESTIONS):
-            return await finish_form(update, context)
-        await ask_question(update, context)
-        return QUESTION
+        return await ask_question(update, context)
     else:
-        await query.message.reply_text("Enter reason\nВведіть зауваження:")
+        await bot_reply(update, context, "Enter reason\nВведіть зауваження:")
         return REASON
 
 # =================== REASON ===================
@@ -1504,9 +1550,11 @@ async def handle_reason(update, context):
     text = update.message.text.strip()
     if text.lower() in ["cancel", "відмінити", "❌"]:
         return await cancel(update, context)
+
+    idx = context.user_data['current_q']
     context.user_data['reason'] = text
     keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
-    await update.message.reply_text("Send photo\nНадішліть фото:", reply_markup=keyboard)
+    await bot_reply(update, context, "Send photo\nНадішліть фото:", reply_markup=keyboard)
     return PHOTO
 
 # =================== PHOTO ===================
@@ -1516,7 +1564,7 @@ async def handle_photo(update, context):
 
     location = context.user_data.get('location', 'UNKNOWN')
     call_sign = context.user_data.get('call_sign', 'UNKNOWN')
-    folder_path = os.path.join("Result", location, call_sign)
+    folder_path = os.path.join(RESULT_FOLDER, location, call_sign)
     os.makedirs(folder_path, exist_ok=True)
 
     if update.message.photo:
@@ -1524,20 +1572,139 @@ async def handle_photo(update, context):
         filename = f"photo_{update.effective_user.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
         filepath = os.path.join(folder_path, filename)
         await photo_file.download_to_drive(filepath)
-        full_remark = f"{reason}. Фото: {filename}" if reason else f"Фото: {filename}"
+        full_remark = f"{reason}. \nФото: {filename}" if reason else f"Фото: {filename}"
     else:
         full_remark = reason
 
     context.user_data['answers'][idx] = {'no': True, 'remark': full_remark}
     context.user_data['current_q'] += 1
 
-    if context.user_data['current_q'] >= len(MONTHLY_QUESTIONS):
-        return await finish_form(update, context)
-    await ask_question(update, context)
-    return QUESTION
+    return await ask_question(update, context)
 
-# =================== FINISH ===================
+# =================== SIGNATURE ===================
+async def ask_signature(update, context):
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
+    await bot_reply(update, context,
+        "📄 Please send your signature as an image (PNG or JPG).\n"
+        "Будь ласка, надішліть вашу підпис у вигляді зображення (PNG або JPG).",
+        reply_markup=keyboard
+    )
+    return SIGNATURE
+
+async def handle_signature(update, context):
+    if update.message.photo:
+        file = update.message.photo[-1]
+    elif update.message.document and update.message.document.file_name.lower().endswith((".png", ".jpg", ".jpeg")):
+        file = update.message.document
+    else:
+        await bot_reply(update, context, "❌ Please send a PNG or JPG image with your signature.\nБудь ласка, надішліть PNG або JPG.")
+        return SIGNATURE
+
+    location = context.user_data.get('location', 'UNKNOWN')
+    call_sign = context.user_data.get('call_sign', 'UNKNOWN')
+    folder_path = os.path.join(RESULT_FOLDER, location, call_sign)
+    os.makedirs(folder_path, exist_ok=True)
+
+    signature_file_path = os.path.abspath(os.path.join(folder_path, f"signature_{update.effective_user.id}.png"))
+    file_obj = await file.get_file()
+    await file_obj.download_to_drive(signature_file_path)
+
+    transparent_signature_path = os.path.abspath(os.path.join(folder_path, f"signature_transparent_{update.effective_user.id}.png"))
+    remove_bg(signature_file_path, transparent_signature_path)
+
+    context.user_data['signature_file'] = transparent_signature_path
+
+    return await finish_form(update, context)
+
+# =================== CLEAR BOT MESSAGES ===================
+async def clear_bot_messages(update, context):
+    chat_id = update.effective_chat.id
+    for msg_id in context.user_data.get('messages', []):
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+        except:
+            pass
+    context.user_data['messages'] = []
+
+# =================== CANCEL ===================
+
+
+# =================== FINISH FORM ===================
+# async def finish_form(update, context):
+#     location = context.user_data.get('location', 'UNKNOWN')
+#     call_sign = context.user_data.get('call_sign', 'UNKNOWN')
+#     folder_path = os.path.join("Result", location, call_sign)
+#     os.makedirs(folder_path, exist_ok=True)
+
+#     final_name = f"193-VMR-{datetime.now().strftime('%y-%b').upper()} {call_sign}"
+#     excel_filename = f"{final_name}.xlsx"
+
+#     # Сохраняем Excel
+#     file_path = save_all_to_excel(context.user_data, folder_path, excel_filename)
+#     manager_ids = MANAGERS.get(location, [])
+
+#     # Отправляем менеджерам
+#     for manager_id in manager_ids:
+#         with open(file_path, "rb") as f:
+#             await context.bot.send_document(chat_id=manager_id, document=f, filename=excel_filename)
+#         await context.bot.send_message(chat_id=manager_id, text=f"📄 New report VMR for location {location}")
+
+#     # Очистка данных и сообщений
+#     context.user_data.clear()
+#     await clear_bot_messages(update, context)
+
+#     # Ждем 5 секунд (по желанию)
+#     await asyncio.sleep(5)
+
+#     # Отправка приветственного фото с кнопкой
+#     logo_bytes_start = get_logo_bytes()
+#     logo_file = InputFile(logo_bytes_start, filename="logo.png")
+#     keyboard = [[InlineKeyboardButton("Start | Почати", callback_data="main_menu")]]
+#     reply_markup = InlineKeyboardMarkup(keyboard)
+
+#     # Пробуем удалить последнее сообщение пользователя
+#     try:
+#         if update.message:
+#             await update.message.delete()
+#     except:
+#         pass
+
+#     # Отправляем новое приветственное сообщение
+#     await update.effective_chat.send_photo(
+#         photo=logo_file,
+#         caption="Welcome to NPA Fleet bot 🚗",
+#         reply_markup=reply_markup
+#     )
+
+#     return ConversationHandler.END
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 async def finish_form(update, context):
+    # ================= Сохраняем Excel =================
     location = context.user_data.get('location', 'UNKNOWN')
     call_sign = context.user_data.get('call_sign', 'UNKNOWN')
     folder_path = os.path.join("Result", location, call_sign)
@@ -1545,40 +1712,89 @@ async def finish_form(update, context):
 
     final_name = f"193-VMR-{datetime.now().strftime('%y-%b').upper()} {call_sign}"
     excel_filename = f"{final_name}.xlsx"
-
     file_path = save_all_to_excel(context.user_data, folder_path, excel_filename)
-    manager_ids = MANAGERS.get(location, [])
 
+    # ================= Отправляем менеджерам =================
+    manager_ids = MANAGERS.get(location, [])
     for manager_id in manager_ids:
         with open(file_path, "rb") as f:
             await context.bot.send_document(chat_id=manager_id, document=f, filename=excel_filename)
         await context.bot.send_message(chat_id=manager_id, text=f"📄 New report VMR for location {location}")
 
-    context.user_data.clear()
-    msg = update.message or (update.callback_query and update.callback_query.message)
+    # ================= Очистка данных пользователя и сообщений бота =================
+    await clear_bot_messages(update, context)
+    context.user_data.clear()  # чистим все user_data
 
-    if msg:
-        await msg.reply_text("✅ Report sent successfully!")
-        await asyncio.sleep(2)
-        logo_bytes_start = get_logo_bytes()
-        logo_file = InputFile(logo_bytes_start, filename="logo.png")
-        keyboard = [[InlineKeyboardButton("Start | Почати", callback_data="main_menu")]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await msg.reply_photo(photo=logo_file, caption="Welcome to NPA Fleet bot 🚗", reply_markup=reply_markup)
+    # ================= Отправка приветственного фото с кнопкой =================
+    await asyncio.sleep(1)  # небольшая пауза, чтобы Telegram успел удалить все старые сообщения
+
+    # получаем логотип как байты
+    logo_bytes_start = get_logo_bytes()
+    logo_file = InputFile(logo_bytes_start, filename="logo.png")
+    keyboard = [[InlineKeyboardButton("Start | Почати", callback_data="main_menu")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # пробуем удалить старое сообщение пользователя, если есть
+    try:
+        if update.message:
+            await update.message.delete()
+        elif update.callback_query:
+            await update.callback_query.message.delete()
+    except:
+        pass
+
+    await update.effective_chat.send_photo(
+        photo=logo_file,
+        caption="Welcome to NPA Fleet bot 🚗",
+        reply_markup=reply_markup
+    )
 
     return ConversationHandler.END
 
-# =================== CANCEL ===================
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data.clear()
-    if update.callback_query:
-        await update.callback_query.answer()
-        try: await update.callback_query.message.delete()
-        except: pass
-    await main_menu(update, context)
-    return ConversationHandler.END
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # =================== HANDLER ===================
+image_filter = (
+    filters.PHOTO |
+    filters.Document.FileExtension("png") |
+    filters.Document.FileExtension("jpg") |
+    filters.Document.FileExtension("jpeg")
+)
+
 inspection_handler = ConversationHandler(
     entry_points=[CallbackQueryHandler(start_inspection, pattern="^monthly_form$")],
     states={
@@ -1589,10 +1805,12 @@ inspection_handler = ConversationHandler(
         USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, user_input)],
         QUESTION: [CallbackQueryHandler(handle_question)],
         REASON: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_reason)],
-        PHOTO: [MessageHandler(filters.PHOTO | (filters.TEXT & ~filters.COMMAND), handle_photo)],
+        PHOTO: [MessageHandler(image_filter, handle_photo)],
+        SIGNATURE: [MessageHandler(image_filter, handle_signature)],
     },
     fallbacks=[CallbackQueryHandler(cancel, pattern="^cancel$")]
 )
+
 
 
 #=============================================================END Monthly inspection form=============================================================
@@ -1817,41 +2035,44 @@ def main():
     )
 
 
+# ======================== HANDLERS ========================
 
-
-    
-    # Handlers
+    # Conversation handlers / form handlers
     app.add_handler(mfr_conv)
-    # app.add_handler(other_questions_conv)
     app.add_handler(ldr_conv)
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(start_button_callback, pattern="main_menu"))
-    app.add_handler(CallbackQueryHandler(ldr_callback, pattern="ldr"))
-    app.add_handler(CallbackQueryHandler(mfr_callback, pattern="mfr"))
-    app.add_handler(CallbackQueryHandler(contacts_callback, pattern="contacts"))
-    
-    
     app.add_handler(inspection_handler)
-       # Ввод данных автомобиля
-    
-    app.add_handler(CallbackQueryHandler(main_menu, pattern="^(ldr|mfr|contacts|accident_procedure|monthly_form)$"))
+    # app.add_handler(other_questions_conv)
 
-
-
-    # Команды администратора
+    # Команды
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("add_user", add_user))
     app.add_handler(CommandHandler("remove_user", remove_user))
     app.add_handler(CommandHandler("list_users", list_users))
 
+    # Главная кнопка (main menu)
+    app.add_handler(CallbackQueryHandler(start_button_callback, pattern="^main_menu$"))
 
-    # Accident procedures (ДТП)
+    # LDR / MFR
+    app.add_handler(CallbackQueryHandler(ldr_callback, pattern="^ldr$"))
+    app.add_handler(CallbackQueryHandler(mfr_callback, pattern="^mfr$"))
+
+    # Contacts (главное и локации)
+    app.add_handler(CallbackQueryHandler(contacts_callback, pattern="^contacts$"))
+    app.add_handler(
+        CallbackQueryHandler(
+            contact_location_callback,
+            pattern="^(contact_shyroke|contact_mykolaiv|shyroke_carwash|shyroke_tire|mykolaiv_carwash|mykolaiv_tire|back)$"
+        )
+    )
+
+    # Accident procedure (ДТП)
     app.add_handler(CallbackQueryHandler(accident_procedure_callback, pattern="^accident_procedure$"))
     app.add_handler(CallbackQueryHandler(accident_procedure_ua_callback, pattern="^accident_procedure_ua$"))
     app.add_handler(CallbackQueryHandler(accident_procedure_en_callback, pattern="^accident_procedure_en$"))
 
-    app.add_handler(CallbackQueryHandler(cancel, pattern="cancel"))
-    app.add_handler(CallbackQueryHandler(contacts_callback, pattern="^contacts$"))
-    app.add_handler(CallbackQueryHandler(contact_location_callback, pattern="^contact_shyroke$|^contact_mykolaiv$|^shyroke_carwash$|^shyroke_tire$|^mykolaiv_carwash$|^mykolaiv_tire$|^back$"))
+    # Cancel
+    app.add_handler(CallbackQueryHandler(cancel, pattern="^cancel$"))
+
 
 
     app.run_polling()
