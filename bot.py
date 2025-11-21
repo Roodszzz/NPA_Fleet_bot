@@ -87,31 +87,46 @@ def auto_adjust(ws, cells):
 
 
 # =================== Главное меню ===================
+TEST_USERS = [507775858,]  # сюда добавляешь кого хочешь
+
 async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+
     keyboard = [
         [InlineKeyboardButton("LDR (Lost / Damage) | Втрачено або пошкоджено", callback_data="ldr")],
         [InlineKeyboardButton("MFR (Mechanical failure) | Механічне пошкодження авто", callback_data="mfr")],
-        [InlineKeyboardButton("Monthly Inspection Form | Щомісячний огляд авто", callback_data="monthly_form")],
+    ]
+
+    if user_id in TEST_USERS:
+        keyboard.append([InlineKeyboardButton("Monthly Inspection Form | Щомісячний огляд авто", callback_data="monthly_form")])
+
+    keyboard += [
         [InlineKeyboardButton("🚨 Порядок дій при ДТП | Accident Procedure", callback_data="accident_procedure")],
         [InlineKeyboardButton("💰 Pay fine | Сплатити штраф", url="https://t.me/ShtrafyPDRbot")],
         [InlineKeyboardButton("Contacts | Контакти", callback_data="contacts")],
     ]
+
     reply_markup = InlineKeyboardMarkup(keyboard)
-    text = ("🇬🇧 EN\n"
-            "Hello! This is the NPA Fleet bot 🚗\n"
-            "I can help you create reports for vehicles.\n\n"
-            "🇺🇦 UA\n"
-            "Привіт! Це бот NPA Fleet 🚗\n"
-            "Я допоможу вам створювати звіти по автомобілях.\n\n"
-            "What are you interested in today? / Що вас цікавить сьогодні?"
-            )
+    text = (
+        "🇬🇧 EN\n"
+        "Hello! This is the NPA Fleet bot 🚗\n"
+        "I can help you create reports for vehicles.\n\n"
+        "🇺🇦 UA\n"
+        "Привіт! Це бот NPA Fleet 🚗\n"
+        "Я допоможу вам створювати звіти по автомобілях.\n\n"
+        "What are you interested in today? / Що вас цікавить сьогодні?"
+    )
+
     if update.callback_query:
         await update.callback_query.answer()
-        try: await update.callback_query.message.delete()
-        except: pass
+        try:
+            await update.callback_query.message.delete()
+        except:
+            pass
         await update.callback_query.message.reply_text(text=text, reply_markup=reply_markup)
     else:
         await update.message.reply_text(text=text, reply_markup=reply_markup)
+
 
 
 
@@ -520,7 +535,7 @@ async def ldr_other_request_input(update: Update, context: ContextTypes.DEFAULT_
 
 # =================== Ввод данных ===================
 
-
+@restricted
 async def serial_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip().upper()
     text = text.replace(" ", "")
@@ -549,7 +564,7 @@ async def serial_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-
+@restricted
 async def odometer_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
 
@@ -575,7 +590,7 @@ async def odometer_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return ALLOCATION_LDR
 
 
-
+@restricted
 async def allocation_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -660,7 +675,7 @@ async def allocation_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return USER_LDR
 
-
+@restricted
 async def team_number_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if not text.isdigit():
@@ -680,7 +695,7 @@ async def team_number_input_ldr(update: Update, context: ContextTypes.DEFAULT_TY
     return USER_LDR
 
 
-
+@restricted
 async def user_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if not text:
@@ -744,6 +759,8 @@ def split_text(text, words_per_line=12):
     words = text.split()
     return [" ".join(words[i:i+words_per_line]) for i in range(0, len(words), words_per_line)]
 
+
+@restricted
 async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if not text:
@@ -835,6 +852,7 @@ def auto_height_for_cell(ws, cell_address, min_height=45):
 
 
 # =================== Заглушки ===================
+@restricted
 async def generic_stub(update: Update, context: ContextTypes.DEFAULT_TYPE, name="Function"):
     query = update.callback_query
     await query.answer()
@@ -911,6 +929,7 @@ with open("asset_num.json", "r", encoding="utf-8") as f:
         return MFR_ALLOCATION
 
     # ------------------------- Выбор локации -------------------------
+    @restricted
     async def mfr_location_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
         await query.answer()
@@ -942,6 +961,7 @@ with open("asset_num.json", "r", encoding="utf-8") as f:
         return MFR_MODEL_SELECTION
 
     # ------------------------- Выбор модели авто -------------------------
+    @restricted
     async def model_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
         await query.answer()
@@ -988,6 +1008,7 @@ with open("asset_num.json", "r", encoding="utf-8") as f:
         return MFR_SERIAL
 
     # ------------------------- Ввод номера авто -------------------------
+    @restricted
     async def serial_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = update.message.text.strip().upper().replace(" ", "")
         
@@ -1033,6 +1054,7 @@ with open("asset_num.json", "r", encoding="utf-8") as f:
 
 
     # ------------------------- Ввод одометра -------------------------
+    @restricted
     async def odometer_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = update.message.text.strip()
         if not text.isdigit():
@@ -1149,6 +1171,7 @@ with open("asset_num.json", "r", encoding="utf-8") as f:
 
 
     # ------------------------- Team Number -------------------------
+    @restricted
     async def team_number_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = update.message.text.strip()
         if not text.isdigit():
@@ -1166,6 +1189,7 @@ with open("asset_num.json", "r", encoding="utf-8") as f:
         return MFR_USER
 
     # ------------------------- User -------------------------
+    @restricted
     async def user_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = update.message.text.strip()
         if not text:
@@ -1202,7 +1226,10 @@ with open("asset_num.json", "r", encoding="utf-8") as f:
     def split_text(text, words_per_line=20):
         words = text.split()
         return [" ".join(words[i:i+words_per_line]) for i in range(0, len(words), words_per_line)]
+    
 
+
+    @restricted
     async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = update.message.text.strip()
         if not text:
@@ -1371,6 +1398,7 @@ def save_all_to_excel(user_data, folder_path, excel_filename):
     return file_path
 
 # =================== START ===================
+@restricted
 async def start_inspection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("Shyroke", callback_data="loc_Shyroke")],
@@ -1384,6 +1412,7 @@ async def start_inspection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return SELECT_LOCATION
 
 # =================== LOCATION SELECT ===================
+@restricted
 async def location_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -1403,6 +1432,7 @@ async def location_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return SELECT_BRAND
 
 # =================== BRAND SELECT ===================
+@restricted
 async def brand_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -1416,6 +1446,7 @@ async def brand_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return CALLSIGN
 
 # =================== CALLSIGN ===================
+@restricted
 async def call_sign_input(update, context):
     text = update.message.text.strip().upper().replace(" ", "").replace("_", "")
     if text.lower() in ["cancel", "відмінити", "❌"]:
@@ -1444,6 +1475,7 @@ async def call_sign_input(update, context):
     return ODOMETER
 
 # =================== ODOMETER ===================
+@restricted
 async def odometer_input(update, context):
     text = update.message.text.strip()
     if text.lower() in ["cancel", "відмінити", "❌"]:
@@ -1458,6 +1490,7 @@ async def odometer_input(update, context):
     return USER
 
 # =================== USER ===================
+@restricted
 async def user_input(update, context):
     text = update.message.text.strip()
     if text.lower() in ["cancel", "відмінити", "❌"]:
@@ -1469,6 +1502,8 @@ async def user_input(update, context):
     return QUESTION
 
 # =================== QUESTIONS ===================
+
+@restricted
 async def ask_question(update, context):
     idx = context.user_data['current_q']
     q = MONTHLY_QUESTIONS[idx]['text']
@@ -1482,6 +1517,10 @@ async def ask_question(update, context):
         await update.callback_query.answer()
     await msg.reply_text(q, reply_markup=keyboard)
 
+
+
+
+@restricted
 async def handle_question(update, context):
     query = update.callback_query
     await query.answer()
@@ -1500,6 +1539,7 @@ async def handle_question(update, context):
         return REASON
 
 # =================== REASON ===================
+@restricted
 async def handle_reason(update, context):
     text = update.message.text.strip()
     if text.lower() in ["cancel", "відмінити", "❌"]:
@@ -1510,6 +1550,7 @@ async def handle_reason(update, context):
     return PHOTO
 
 # =================== PHOTO ===================
+@restricted
 async def handle_photo(update, context):
     idx = context.user_data['current_q']
     reason = context.user_data.pop('reason', '')
@@ -1537,6 +1578,7 @@ async def handle_photo(update, context):
     return QUESTION
 
 # =================== FINISH ===================
+@restricted
 async def finish_form(update, context):
     location = context.user_data.get('location', 'UNKNOWN')
     call_sign = context.user_data.get('call_sign', 'UNKNOWN')
@@ -1569,6 +1611,7 @@ async def finish_form(update, context):
     return ConversationHandler.END
 
 # =================== CANCEL ===================
+@restricted
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     if update.callback_query:
