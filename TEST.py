@@ -520,7 +520,7 @@ async def ldr_other_request_input(update: Update, context: ContextTypes.DEFAULT_
 
 # =================== Ввод данных ===================
 
-
+@restricted
 async def serial_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip().upper()
     text = text.replace(" ", "")
@@ -549,7 +549,7 @@ async def serial_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-
+@restricted
 async def odometer_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
 
@@ -575,7 +575,7 @@ async def odometer_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return ALLOCATION_LDR
 
 
-
+@restricted
 async def allocation_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -660,7 +660,7 @@ async def allocation_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return USER_LDR
 
-
+@restricted
 async def team_number_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if not text.isdigit():
@@ -680,7 +680,7 @@ async def team_number_input_ldr(update: Update, context: ContextTypes.DEFAULT_TY
     return USER_LDR
 
 
-
+@restricted
 async def user_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if not text:
@@ -744,6 +744,8 @@ def split_text(text, words_per_line=12):
     words = text.split()
     return [" ".join(words[i:i+words_per_line]) for i in range(0, len(words), words_per_line)]
 
+
+@restricted
 async def description_input_ldr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if not text:
@@ -835,6 +837,7 @@ def auto_height_for_cell(ws, cell_address, min_height=45):
 
 
 # =================== Заглушки ===================
+@restricted
 async def generic_stub(update: Update, context: ContextTypes.DEFAULT_TYPE, name="Function"):
     query = update.callback_query
     await query.answer()
@@ -911,6 +914,7 @@ with open("asset_num.json", "r", encoding="utf-8") as f:
         return MFR_ALLOCATION
 
     # ------------------------- Выбор локации -------------------------
+    @restricted
     async def mfr_location_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
         await query.answer()
@@ -942,6 +946,7 @@ with open("asset_num.json", "r", encoding="utf-8") as f:
         return MFR_MODEL_SELECTION
 
     # ------------------------- Выбор модели авто -------------------------
+    @restricted
     async def model_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
         await query.answer()
@@ -988,6 +993,7 @@ with open("asset_num.json", "r", encoding="utf-8") as f:
         return MFR_SERIAL
 
     # ------------------------- Ввод номера авто -------------------------
+    @restricted
     async def serial_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = update.message.text.strip().upper().replace(" ", "")
         
@@ -1033,6 +1039,7 @@ with open("asset_num.json", "r", encoding="utf-8") as f:
 
 
     # ------------------------- Ввод одометра -------------------------
+    @restricted
     async def odometer_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = update.message.text.strip()
         if not text.isdigit():
@@ -1149,6 +1156,8 @@ with open("asset_num.json", "r", encoding="utf-8") as f:
 
 
     # ------------------------- Team Number -------------------------
+
+    @restricted
     async def team_number_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = update.message.text.strip()
         if not text.isdigit():
@@ -1166,6 +1175,8 @@ with open("asset_num.json", "r", encoding="utf-8") as f:
         return MFR_USER
 
     # ------------------------- User -------------------------
+
+    @restricted
     async def user_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = update.message.text.strip()
         if not text:
@@ -1203,6 +1214,8 @@ with open("asset_num.json", "r", encoding="utf-8") as f:
         words = text.split()
         return [" ".join(words[i:i+words_per_line]) for i in range(0, len(words), words_per_line)]
 
+
+    @restricted
     async def description_input_mfr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = update.message.text.strip()
         if not text:
@@ -1377,6 +1390,7 @@ def save_all_to_excel(user_data, folder_path, excel_filename):
     return file_path
 
 # =================== УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ОТВЕТА С УДАЛЕНИЕМ ПРЕДЫДУЩИХ СООБЩЕНИЙ ===================
+@restricted
 async def bot_reply(update, context, text, reply_markup=None):
     # удаляем предыдущие сообщения бота
     for msg_id in context.user_data.get('messages', []):
@@ -1405,6 +1419,7 @@ def remove_bg(input_path, output_path):
     img.save(output_path, "PNG")
 
 # =================== START ===================
+@restricted
 async def start_inspection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Если есть callback_query (нажатие кнопки), удаляем сообщение меню
     if update.callback_query:
@@ -1425,6 +1440,7 @@ async def start_inspection(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =================== LOCATION SELECT ===================
+@restricted
 async def location_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -1453,6 +1469,7 @@ async def location_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =================== BRAND SELECT ===================
+@restricted
 async def brand_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -1465,6 +1482,7 @@ async def brand_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return CALLSIGN
 
 # =================== CALLSIGN ===================
+@restricted
 async def call_sign_input(update, context):
     text = update.message.text.strip().upper().replace(" ", "").replace("_", "")
     if text.lower() in ["cancel", "відмінити", "❌"]:
@@ -1490,6 +1508,7 @@ async def call_sign_input(update, context):
     return ODOMETER
 
 # =================== ODOMETER ===================
+@restricted
 async def odometer_input(update, context):
     text = update.message.text.strip()
     if text.lower() in ["cancel", "відмінити", "❌"]:
@@ -1505,6 +1524,7 @@ async def odometer_input(update, context):
     return USER
 
 # =================== USER ===================
+@restricted
 async def user_input(update, context):
     text = update.message.text.strip()
     if text.lower() in ["cancel", "відмінити", "❌"]:
@@ -1516,6 +1536,7 @@ async def user_input(update, context):
     return await ask_question(update, context)
 
 # =================== QUESTIONS ===================
+@restricted
 async def ask_question(update, context):
     idx = context.user_data['current_q']
     if idx >= len(MONTHLY_QUESTIONS):
@@ -1530,6 +1551,10 @@ async def ask_question(update, context):
     await bot_reply(update, context, q, reply_markup=keyboard)
     return QUESTION
 
+
+
+
+@restricted
 async def handle_question(update, context):
     query = update.callback_query
     await query.answer()
@@ -1546,6 +1571,7 @@ async def handle_question(update, context):
         return REASON
 
 # =================== REASON ===================
+@restricted
 async def handle_reason(update, context):
     text = update.message.text.strip()
     if text.lower() in ["cancel", "відмінити", "❌"]:
@@ -1558,6 +1584,7 @@ async def handle_reason(update, context):
     return PHOTO
 
 # =================== PHOTO ===================
+@restricted
 async def handle_photo(update, context):
     idx = context.user_data['current_q']
     reason = context.user_data.pop('reason', '')
@@ -1582,6 +1609,8 @@ async def handle_photo(update, context):
     return await ask_question(update, context)
 
 # =================== SIGNATURE ===================
+
+@restricted
 async def ask_signature(update, context):
     keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel / Відмінити", callback_data="cancel")]])
     await bot_reply(update, context,
@@ -1591,6 +1620,8 @@ async def ask_signature(update, context):
     )
     return SIGNATURE
 
+
+@restricted
 async def handle_signature(update, context):
     if update.message.photo:
         file = update.message.photo[-1]
@@ -1617,6 +1648,7 @@ async def handle_signature(update, context):
     return await finish_form(update, context)
 
 # =================== CLEAR BOT MESSAGES ===================
+@restricted
 async def clear_bot_messages(update, context):
     chat_id = update.effective_chat.id
     for msg_id in context.user_data.get('messages', []):
@@ -1626,83 +1658,9 @@ async def clear_bot_messages(update, context):
             pass
     context.user_data['messages'] = []
 
-# =================== CANCEL ===================
 
 
-# =================== FINISH FORM ===================
-# async def finish_form(update, context):
-#     location = context.user_data.get('location', 'UNKNOWN')
-#     call_sign = context.user_data.get('call_sign', 'UNKNOWN')
-#     folder_path = os.path.join("Result", location, call_sign)
-#     os.makedirs(folder_path, exist_ok=True)
-
-#     final_name = f"193-VMR-{datetime.now().strftime('%y-%b').upper()} {call_sign}"
-#     excel_filename = f"{final_name}.xlsx"
-
-#     # Сохраняем Excel
-#     file_path = save_all_to_excel(context.user_data, folder_path, excel_filename)
-#     manager_ids = MANAGERS.get(location, [])
-
-#     # Отправляем менеджерам
-#     for manager_id in manager_ids:
-#         with open(file_path, "rb") as f:
-#             await context.bot.send_document(chat_id=manager_id, document=f, filename=excel_filename)
-#         await context.bot.send_message(chat_id=manager_id, text=f"📄 New report VMR for location {location}")
-
-#     # Очистка данных и сообщений
-#     context.user_data.clear()
-#     await clear_bot_messages(update, context)
-
-#     # Ждем 5 секунд (по желанию)
-#     await asyncio.sleep(5)
-
-#     # Отправка приветственного фото с кнопкой
-#     logo_bytes_start = get_logo_bytes()
-#     logo_file = InputFile(logo_bytes_start, filename="logo.png")
-#     keyboard = [[InlineKeyboardButton("Start | Почати", callback_data="main_menu")]]
-#     reply_markup = InlineKeyboardMarkup(keyboard)
-
-#     # Пробуем удалить последнее сообщение пользователя
-#     try:
-#         if update.message:
-#             await update.message.delete()
-#     except:
-#         pass
-
-#     # Отправляем новое приветственное сообщение
-#     await update.effective_chat.send_photo(
-#         photo=logo_file,
-#         caption="Welcome to NPA Fleet bot 🚗",
-#         reply_markup=reply_markup
-#     )
-
-#     return ConversationHandler.END
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+@restricted
 async def finish_form(update, context):
     # ================= Сохраняем Excel =================
     location = context.user_data.get('location', 'UNKNOWN')
@@ -1750,41 +1708,6 @@ async def finish_form(update, context):
     )
 
     return ConversationHandler.END
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # =================== HANDLER ===================
