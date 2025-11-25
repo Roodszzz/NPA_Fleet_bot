@@ -1373,12 +1373,12 @@ def save_all_to_excel(user_data, folder_path, excel_filename):
         ws = wb.sheets[0]
 
         # ======= Общие данные =======
-        ws.range("A4").value = datetime.now().strftime("%Y-%m-%d")
-        ws.range("B4").value = user_data.get("brand", "")
-        ws.range("C4").value = user_data.get("registration_number", "")
-        ws.range("E4").value = user_data.get("call_sign", "")
-        ws.range("G4").value = user_data.get("odometer", "")
-        ws.range("H4").value = user_data.get("driver_name", "")
+        ws.range("B5").value = datetime.now().strftime("%Y-%m-%d")
+        ws.range("C5").value = user_data.get("brand", "")
+        ws.range("D5").value = user_data.get("registration_number", "")
+        ws.range("F5").value = user_data.get("call_sign", "")
+        ws.range("G5").value = user_data.get("odometer", "")
+        ws.range("H5").value = user_data.get("driver_name", "")
 
         # ======= Вопросы =======
         for idx, q_data in enumerate(MONTHLY_QUESTIONS):

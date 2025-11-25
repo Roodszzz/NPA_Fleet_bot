@@ -1350,12 +1350,12 @@ def save_all_to_excel(user_data, folder_path, excel_filename):
         ws = wb.sheets[0]
 
         # ======= Общие данные =======
-        ws.range("A4").value = datetime.now().strftime("%Y-%m-%d")
-        ws.range("B4").value = user_data.get("brand", "")
-        ws.range("C4").value = user_data.get("registration_number", "")
-        ws.range("E4").value = user_data.get("call_sign", "")
-        ws.range("G4").value = user_data.get("odometer", "")
-        ws.range("H4").value = user_data.get("driver_name", "")
+        ws.range("B5").value = datetime.now().strftime("%Y-%m-%d")
+        ws.range("C5").value = user_data.get("brand", "")
+        ws.range("D5").value = user_data.get("registration_number", "")
+        ws.range("F5").value = user_data.get("call_sign", "")
+        ws.range("G5").value = user_data.get("odometer", "")
+        ws.range("H5").value = user_data.get("driver_name", "")
 
         # ======= Вопросы =======
         for idx, q_data in enumerate(MONTHLY_QUESTIONS):
@@ -1377,7 +1377,7 @@ def save_all_to_excel(user_data, folder_path, excel_filename):
 
             pic_width = int(93 * 1.2)   # ширина в пикселях
             pic_height = int(106 * 1.2) # высота в пикселях
-            cell = ws.range("F23")
+            cell = ws.range("G23")
             left = cell.left + (cell.width - pic_width) / 2
             top = cell.top + (cell.height - pic_height) / 2
             ws.pictures.add(signature_file, left=left, top=top, width=pic_width, height=pic_height)
