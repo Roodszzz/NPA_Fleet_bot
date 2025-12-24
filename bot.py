@@ -87,7 +87,7 @@ def auto_adjust(ws, cells):
 
 
 # =================== Главное меню ===================
-TEST_USERS = [507775858, 6093640376,]  # сюда добавляешь кого хочешь
+TEST_USERS = [507775858, 6093640376, 5749131990, ]  # сюда добавляешь кого хочешь
 
 async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
