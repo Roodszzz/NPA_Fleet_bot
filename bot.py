@@ -290,7 +290,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 MANAGERS = {
     "Shyroke": [ADMIN_ID],
     "Mykolaiv": [6093640376, 6488832046],
-    "Kyiv": [ADMIN_ID],     
+    "Kyiv": [ADMIN_ID, 6093640376],     
     "Sumy/Romny": [ADMIN_ID]
 }
 
